@@ -363,10 +363,10 @@ export default function ReportForm({
       </p>
 
       <div>
-        <span className="block text-sm font-semibold tracking-wide uppercase">
+        <span className="eyebrow block">
           Photo of the obstacle
         </span>
-        <p id="report-photo-hint" className="mt-1 text-xs text-ink-muted">
+        <p id="report-photo-hint" className="lede mt-1">
           A walkway, entrance, crossing, or transit access point. Anything else is rejected
           and nothing is stored.
         </p>
@@ -398,7 +398,7 @@ export default function ReportForm({
             onClick={() => fileInputRef.current?.click()}
             aria-describedby="report-photo-hint"
             disabled={busy}
-            className="border border-line px-3 py-1.5 text-sm"
+            className="btn btn-lg"
           >
             Choose file
           </button>
@@ -433,15 +433,15 @@ export default function ReportForm({
       ) : null}
 
       <fieldset>
-        <legend className="text-sm font-semibold tracking-wide uppercase">Location</legend>
-        <p className="mt-1 text-xs text-ink-muted">{geoMessage}</p>
+        <legend className="eyebrow">Location</legend>
+        <p className="lede mt-1">{geoMessage}</p>
 
         <div className="mt-2 flex flex-wrap gap-2">
           <button
             type="button"
             onClick={useDeviceLocation}
             disabled={busy}
-            className="border border-line px-2 py-1 text-xs"
+            className="btn"
           >
             Use my location
           </button>
@@ -453,7 +453,7 @@ export default function ReportForm({
             onClick={() => onPickingChange(!picking)}
             aria-pressed={picking}
             disabled={busy}
-            className="border border-line px-2 py-1 text-xs"
+            className="btn"
           >
             {picking ? "Stop choosing on map" : "Choose on map"}
           </button>
@@ -476,7 +476,7 @@ export default function ReportForm({
               value={manualLat}
               onChange={(event) => setManualLat(event.target.value)}
               disabled={busy}
-              className="w-28 border border-line px-2 py-1 text-sm"
+              className="field w-28"
             />
           </span>
           <span className="flex flex-col">
@@ -489,14 +489,14 @@ export default function ReportForm({
               value={manualLng}
               onChange={(event) => setManualLng(event.target.value)}
               disabled={busy}
-              className="w-28 border border-line px-2 py-1 text-sm"
+              className="field w-28"
             />
           </span>
           <button
             type="button"
             onClick={useManualLocation}
             disabled={busy}
-            className="border border-line px-2 py-1 text-xs"
+            className="btn"
           >
             Use these coordinates
           </button>
@@ -507,7 +507,7 @@ export default function ReportForm({
         <button
           type="submit"
           disabled={!canSubmit}
-          className="border border-line px-3 py-1.5 text-sm disabled:text-ink-muted"
+          className="btn btn-lg btn-primary"
         >
           {busy ? "Working" : "Submit report"}
         </button>
@@ -534,9 +534,9 @@ export default function ReportForm({
       ) : null}
 
       {status === "error" && errorMessage ? (
-        <div className="border border-line px-3 py-2">
+        <div className="surface px-3 py-2">
           <p className="text-sm">Report not saved.</p>
-          <p className="mt-1 text-xs text-ink-muted">{errorMessage}</p>
+          <p className="lede mt-1">{errorMessage}</p>
         </div>
       ) : null}
 
@@ -545,23 +545,23 @@ export default function ReportForm({
           ref={resultRef}
           tabIndex={-1}
           data-focus-quiet
-          className="border border-line px-3 py-3"
+          className="surface px-3 py-3"
         >
-          <h3 className="text-sm font-semibold tracking-wide uppercase">Report saved</h3>
+          <h3 className="eyebrow">Report saved</h3>
 
           <dl className="mt-2 flex flex-col gap-2 text-sm">
             <div>
-              <dt className="text-xs tracking-wide text-ink-muted uppercase">Description</dt>
+              <dt className="eyebrow">Description</dt>
               <dd className="mt-0.5">{result.ai_description}</dd>
             </div>
             <div>
-              <dt className="text-xs tracking-wide text-ink-muted uppercase">Obstacle types</dt>
+              <dt className="eyebrow">Obstacle types</dt>
               <dd className="mt-0.5">
                 {result.obstacle_types.map((type) => obstacleTypeLabel(type)).join(", ")}
               </dd>
             </div>
             <div>
-              <dt className="text-xs tracking-wide text-ink-muted uppercase">
+              <dt className="eyebrow">
                 Severity by profile
               </dt>
               <dd className="mt-0.5">
@@ -576,7 +576,7 @@ export default function ReportForm({
               </dd>
             </div>
             <div>
-              <dt className="text-xs tracking-wide text-ink-muted uppercase">Permanence</dt>
+              <dt className="eyebrow">Permanence</dt>
               <dd className="mt-0.5">
                 {result.permanence === "permanent"
                   ? "Permanent, part of the built environment"
@@ -584,18 +584,18 @@ export default function ReportForm({
               </dd>
             </div>
             <div>
-              <dt className="text-xs tracking-wide text-ink-muted uppercase">Model confidence</dt>
+              <dt className="eyebrow">Model confidence</dt>
               <dd className="mt-0.5">{formatConfidence(result.ai_confidence)}</dd>
             </div>
           </dl>
 
           <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" onClick={reset} className="border border-line px-2 py-1 text-xs">
+            <button type="button" onClick={reset} className="btn">
               Report another obstacle
             </button>
             {/* Closes the panel and the detail view of the report just filed, so
                 the summary is not left on screen with no way out of it. */}
-            <button type="button" onClick={onDone} className="border border-line px-2 py-1 text-xs">
+            <button type="button" onClick={onDone} className="btn">
               Back to list
             </button>
           </div>

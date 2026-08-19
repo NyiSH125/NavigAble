@@ -23,7 +23,7 @@ interface ReportDetailProps {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="border-b border-hairline py-2 last:border-b-0">
-      <dt className="text-xs tracking-wide text-ink-muted uppercase">{label}</dt>
+      <dt className="eyebrow">{label}</dt>
       <dd className="mt-1 text-sm">{children}</dd>
     </div>
   );
@@ -57,14 +57,14 @@ export default function ReportDetail({ report, onBackToList }: ReportDetailProps
           ref={headingRef}
           tabIndex={-1}
           data-focus-quiet
-          className="text-sm font-semibold tracking-wide uppercase"
+          className="eyebrow"
         >
           Report detail
         </h2>
         <button
           type="button"
           onClick={onBackToList}
-          className="border border-line px-2 py-1 text-xs"
+          className="btn"
         >
           Back to list
         </button>

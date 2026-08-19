@@ -57,7 +57,7 @@ export default function RouteSteps({
       </p>
 
       <div className="border-b border-hairline px-4 py-3">
-        <h2 id={headingId} className="text-sm font-semibold tracking-wide uppercase">
+        <h2 id={headingId} className="eyebrow">
           Route
         </h2>
 

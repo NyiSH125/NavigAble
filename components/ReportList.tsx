@@ -58,7 +58,7 @@ export default function ReportList({
   if (reports.length === 0) {
     return (
       <section aria-labelledby={headingId} className="p-4">
-        <h2 id={headingId} className="text-sm font-semibold tracking-wide uppercase">
+        <h2 id={headingId} className="eyebrow">
           Reports in view
         </h2>
         <p className="mt-2 text-sm text-ink-muted">
@@ -70,12 +70,12 @@ export default function ReportList({
   }
 
   return (
-    <section aria-labelledby={headingId} className="flex min-h-0 flex-col">
+    <section aria-labelledby={headingId}>
       <div className="border-b border-hairline px-4 py-3">
-        <h2 id={headingId} className="text-sm font-semibold tracking-wide uppercase">
+        <h2 id={headingId} className="eyebrow">
           Reports in view
         </h2>
-        <p className="mt-1 text-xs text-ink-muted">
+        <p className="lede mt-1">
           {ordered.length} {ordered.length === 1 ? "report" : "reports"}, most severe for
           the {meta.label.toLowerCase()} profile first.
           {truncated
@@ -84,7 +84,7 @@ export default function ReportList({
         </p>
       </div>
 
-      <ol ref={listRef} className="min-h-0 flex-1 overflow-y-auto">
+      <ol ref={listRef}>
         {ordered.map((report, index) => {
           const score = severityFor(report, profile);
           const selected = report.id === selectedId;

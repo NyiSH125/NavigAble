@@ -116,13 +116,13 @@ export default function RoutePlanner({
       </p>
 
       <fieldset>
-        <legend className="text-sm font-semibold tracking-wide uppercase">Start</legend>
-        <p className="mt-1 text-xs text-ink-muted">{startLabel}</p>
+        <legend className="eyebrow">Start</legend>
+        <p className="lede mt-1">{startLabel}</p>
         <button
           type="button"
           onClick={useDeviceLocation}
           disabled={loading}
-          className="mt-2 border border-line px-2 py-1 text-xs"
+          className="btn mt-2"
         >
           Use my location
         </button>
@@ -138,7 +138,7 @@ export default function RoutePlanner({
               value={startLat}
               onChange={(event) => setStartLat(event.target.value)}
               disabled={loading}
-              className="w-28 border border-line px-2 py-1 text-sm"
+              className="field w-28"
             />
           </span>
           <span className="flex flex-col">
@@ -151,14 +151,14 @@ export default function RoutePlanner({
               value={startLng}
               onChange={(event) => setStartLng(event.target.value)}
               disabled={loading}
-              className="w-28 border border-line px-2 py-1 text-sm"
+              className="field w-28"
             />
           </span>
           <button
             type="button"
             onClick={useManualStart}
             disabled={loading}
-            className="border border-line px-2 py-1 text-xs"
+            className="btn"
           >
             Use these coordinates
           </button>
@@ -166,8 +166,8 @@ export default function RoutePlanner({
       </fieldset>
 
       <fieldset>
-        <legend className="text-sm font-semibold tracking-wide uppercase">Destination</legend>
-        <p className="mt-1 text-xs text-ink-muted">
+        <legend className="eyebrow">Destination</legend>
+        <p className="lede mt-1">
           A short list of places, since there is no address search in this build.
         </p>
         <div className="mt-2 flex flex-col gap-1.5">
@@ -203,12 +203,12 @@ export default function RoutePlanner({
         <button
           type="submit"
           disabled={!start || !destination || loading}
-          className="border border-line px-3 py-1.5 text-sm disabled:text-ink-muted"
+          className="btn btn-lg btn-primary"
         >
           {loading ? "Finding route" : "Find route"}
         </button>
         {route ? (
-          <button type="button" onClick={onClear} className="border border-line px-2 py-1 text-xs">
+          <button type="button" onClick={onClear} className="btn">
             Clear route
           </button>
         ) : null}
@@ -225,9 +225,9 @@ export default function RoutePlanner({
       ) : null}
 
       {error && !loading ? (
-        <div className="border border-line px-3 py-2">
+        <div className="surface px-3 py-2">
           <p className="text-sm">No route yet.</p>
-          <p className="mt-1 text-xs text-ink-muted">{error}</p>
+          <p className="lede mt-1">{error}</p>
         </div>
       ) : null}
 

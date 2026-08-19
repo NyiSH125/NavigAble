@@ -69,8 +69,8 @@ export function SeverityBadge({
 export function SeverityLegend() {
   const scores: SeverityScore[] = [0, 1, 2, 3];
   return (
-    <div className="border border-hairline bg-panel p-3">
-      <h3 className="mb-2 text-xs font-semibold tracking-wide text-ink-muted uppercase">
+    <div className="surface p-3">
+      <h3 className="eyebrow mb-2">
         Severity key
       </h3>
       <ul className="flex flex-col gap-1.5 text-sm">
@@ -80,9 +80,9 @@ export function SeverityLegend() {
           </li>
         ))}
       </ul>
-      <p className="mt-2 text-xs text-ink-muted">
-        Larger circles with thicker outlines mean higher severity, so the levels stay
-        readable without colour.
+      <p className="lede mt-2">
+        On the map, larger circles with thicker outlines mean higher severity, so the
+        levels stay readable without colour.
       </p>
     </div>
   );

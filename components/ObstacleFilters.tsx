@@ -32,10 +32,10 @@ export default function ObstacleFilters({
       {/* Radio group rather than a select, so the whole set is visible and
           arrow keys move between profiles. */}
       <fieldset>
-        <legend className="text-sm font-semibold tracking-wide uppercase">
+        <legend className="eyebrow">
           Your profile
         </legend>
-        <p className="mt-1 text-xs text-ink-muted">
+        <p className="lede mt-1">
           Sets which severity the map and list show.
         </p>
         <div className="mt-2 flex flex-col gap-1.5">
@@ -59,10 +59,10 @@ export default function ObstacleFilters({
       </fieldset>
 
       <fieldset>
-        <legend className="text-sm font-semibold tracking-wide uppercase">
+        <legend className="eyebrow">
           Obstacle types
         </legend>
-        <p className="mt-1 text-xs text-ink-muted">
+        <p className="lede mt-1">
           {selectedTypes.length === 0
             ? "Showing every type. Check a box to narrow the map."
             : `Showing ${selectedTypes.length} of ${FILTERABLE_OBSTACLE_TYPES.length} types.`}
@@ -85,7 +85,7 @@ export default function ObstacleFilters({
           <button
             type="button"
             onClick={() => onTypesChange([])}
-            className="mt-3 border border-line px-2 py-1 text-xs"
+            className="btn mt-3"
           >
             Clear all obstacle filters
           </button>

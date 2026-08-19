@@ -13,6 +13,7 @@ import type { RouteView } from "@/components/RouteSteps";
 import type { LngLat } from "@/lib/routing";
 import ReportDetail from "@/components/ReportDetail";
 import ReportList from "@/components/ReportList";
+import { SeverityLegend } from "@/components/SeverityBadge";
 import { MapSkeleton, ReportListSkeleton } from "@/components/Skeleton";
 
 // MapLibre touches window at import time, so it never runs on the server. The
@@ -232,7 +233,7 @@ export default function Page() {
       </a>
 
       <header className="flex items-baseline justify-between gap-4 border-b border-line px-4 py-3">
-        <h1 className="text-base font-semibold tracking-wide">NavigAble</h1>
+        <h1 className="wordmark">NavigAble</h1>
         <p className="text-xs text-ink-muted">
           Accessibility obstacles near you. The list is the full record, the map is a
           picture of it.
@@ -262,10 +263,12 @@ export default function Page() {
               }}
               aria-expanded={reportOpen}
               aria-controls="report-form-panel"
-              className="w-full px-4 py-3 text-left text-sm font-semibold tracking-wide uppercase"
+              className="w-full px-4 py-3 text-left"
             >
-              {reportOpen ? "Close reporting form" : "Report an obstacle"}
-              <span className="mt-0.5 block text-xs font-normal normal-case tracking-normal text-ink-muted">
+              <span className="heading block">
+                {reportOpen ? "Close reporting form" : "Report an obstacle"}
+              </span>
+              <span className="lede mt-0.5 block">
                 Photograph what is in the way. It is classified for all four profiles.
               </span>
             </button>
@@ -289,10 +292,12 @@ export default function Page() {
               onClick={() => setRouteOpen((open) => !open)}
               aria-expanded={routeOpen}
               aria-controls="route-planner-panel"
-              className="w-full px-4 py-3 text-left text-sm font-semibold tracking-wide uppercase"
+              className="w-full px-4 py-3 text-left"
             >
-              {routeOpen ? "Close route planner" : "Plan a route"}
-              <span className="mt-0.5 block text-xs font-normal normal-case tracking-normal text-ink-muted">
+              <span className="heading block">
+                {routeOpen ? "Close route planner" : "Plan a route"}
+              </span>
+              <span className="lede mt-0.5 block">
                 Routes around obstacles that block your profile.
               </span>
             </button>
@@ -336,14 +341,18 @@ export default function Page() {
             </button>
           </div>
 
+          <div className="shrink-0 border-b border-hairline px-4 py-4">
+            <SeverityLegend />
+          </div>
+
           {error ? (
             <div className="border-b border-line px-4 py-3">
               <p className="text-sm">Could not load reports.</p>
-              <p className="mt-1 text-xs text-ink-muted">{error}</p>
+              <p className="lede mt-1">{error}</p>
               <button
                 type="button"
                 onClick={() => setBbox((current) => ({ ...current }))}
-                className="mt-2 border border-line px-2 py-1 text-xs"
+                className="btn mt-2"
               >
                 Try again
               </button>
@@ -367,6 +376,8 @@ export default function Page() {
           {selectedReport ? (
             <ReportDetail report={selectedReport} onBackToList={handleBackToList} />
           ) : null}
+
+
         </div>
 
         <div

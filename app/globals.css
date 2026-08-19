@@ -22,12 +22,36 @@
   --color-sev1: #c9a227;
   --color-sev2: #d1662b;
   --color-sev3: #b3332b;
+
+  --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-serif), ui-serif, Georgia, serif;
+}
+
+/* Frosted surfaces.
+   Requested explicitly, and worth recording that this is the one place the
+   project rules are broken on purpose: CLAUDE.md says no glass effects, and
+   "liquid glass" is number 8 on the global list of tells. The alpha floor is
+   deliberately high so text contrast survives whatever ends up behind the
+   surface, which is what usually goes wrong with glass. No drop shadow either:
+   depth comes from a hairline border and one top highlight. */
+:root {
+  --glass-fill: color-mix(in srgb, #262b33 88%, transparent);
+  --glass-fill-hover: color-mix(in srgb, #2e343d 92%, transparent);
+  --glass-fill-strong: color-mix(in srgb, #333a44 94%, transparent);
+  --glass-edge: color-mix(in srgb, #f4f0e8 44%, transparent);
+  --glass-top: color-mix(in srgb, #f4f0e8 12%, transparent);
 }
 
 body {
   background: var(--color-ground);
   color: var(--color-ink);
-  font-family: ui-sans-serif, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  line-height: 1.55;
+  /* Figures line up in columns: severity scores, distances, coordinates. */
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 /* Focus is never hidden and never relies on colour alone: the ring is offset
@@ -42,6 +66,116 @@ body {
 [data-focus-quiet]:focus:not(:focus-visible) {
   outline: none;
 }
+
+/* Typography -------------------------------------------------------------- */
+
+.wordmark {
+  font-family: var(--font-serif);
+  font-size: 1.4rem;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+}
+
+/* Section labels. Letterspaced caps at a small size read as structure, where
+   bold all-caps sans at body size reads as shouting. */
+.eyebrow {
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+
+.heading {
+  font-family: var(--font-serif);
+  font-size: 1.0625rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--color-ink);
+}
+
+.lede {
+  font-size: 0.75rem;
+  color: var(--color-ink-muted);
+}
+
+/* Controls ---------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-ink);
+  background-color: var(--glass-fill);
+  background-image: linear-gradient(var(--glass-top), transparent 42%);
+  border: 1px solid var(--glass-edge);
+  border-radius: 4px;
+}
+
+.btn:hover:not(:disabled) {
+  background-color: var(--glass-fill-hover);
+  border-color: color-mix(in srgb, #f4f0e8 62%, transparent);
+}
+
+.btn:active:not(:disabled) {
+  background-color: var(--glass-fill-strong);
+}
+
+.btn:disabled {
+  color: var(--color-ink-muted);
+  border-color: var(--color-hairline);
+  background-image: none;
+}
+
+.btn-lg {
+  padding: 0.5rem 0.9rem;
+  font-size: 0.875rem;
+}
+
+/* One call to action per panel. A warm edge rather than a filled block, so it
+   reads as primary without competing with the map. */
+.btn-primary:not(:disabled) {
+  border-color: var(--color-focus);
+  background-color: color-mix(in srgb, #33301f 92%, transparent);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: color-mix(in srgb, #474030 92%, transparent);
+  border-color: var(--color-focus);
+}
+
+.field {
+  padding: 0.35rem 0.55rem;
+  font-size: 0.8125rem;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background-color: color-mix(in srgb, #101215 70%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: 3px;
+}
+
+.field::placeholder {
+  color: var(--color-ink-muted);
+}
+
+.surface {
+  background-color: var(--glass-fill);
+  border: 1px solid var(--glass-edge);
+  border-radius: 4px;
+}
+
+/* Native controls follow the warm accent rather than the browser default. */
+input[type="radio"],
+input[type="checkbox"] {
+  accent-color: var(--color-focus);
+}
+
+/* Skeletons --------------------------------------------------------------- */
 
 .skeleton {
   background-color: var(--color-raised);
@@ -64,6 +198,8 @@ body {
     opacity: 0.7;
   }
 }
+
+/* MapLibre ---------------------------------------------------------------- */
 
 /* MapLibre ships a light theme with rounded corners. Bring it in line with the
    dark ground and the 4px radius ceiling. Attribution stays visible and
@@ -90,22 +226,40 @@ summary.maplibregl-ctrl-attrib-button {
 .maplibregl-ctrl-group,
 .maplibregl-ctrl.maplibregl-ctrl-group,
 .maplibregl-ctrl.maplibregl-ctrl-group:not(:empty) {
-  background-color: var(--color-panel);
-  border: 1px solid var(--color-line);
-  border-radius: 3px;
+  background-color: var(--glass-fill);
+  border: 1px solid var(--glass-edge);
+  border-radius: 4px;
   box-shadow: none;
 }
 
 .maplibregl-ctrl-group button,
 .maplibregl-ctrl-group button:not(:disabled):hover {
-  background-color: var(--color-panel);
   border-radius: 0;
+  background-color: transparent;
+}
+
+.maplibregl-ctrl-group button:not(:disabled):hover {
+  background-color: var(--glass-fill-hover);
 }
 
 .maplibregl-ctrl-group button + button {
-  border-top: 1px solid var(--color-hairline);
+  border-top: 1px solid var(--glass-edge);
 }
 
 .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
   filter: invert(1) hue-rotate(180deg);
+}
+
+/* Tailwind's CSS pipeline strips a bare backdrop-filter declaration, so the
+   frosting is declared behind a feature query, which survives compilation and is
+   the correct guard anyway: browsers without support get the solid fill, which
+   already carries the contrast. */
+@supports (backdrop-filter: blur(10px)) or (-webkit-backdrop-filter: blur(10px)) {
+  .btn,
+  .surface,
+  .maplibregl-ctrl.maplibregl-ctrl-group,
+  .maplibregl-ctrl.maplibregl-ctrl-attrib {
+    -webkit-backdrop-filter: blur(12px) saturate(130%);
+    backdrop-filter: blur(12px) saturate(130%);
+  }
 }
