@@ -5,7 +5,9 @@ import { severityMeta, type SeverityShape } from "@/lib/reports";
  * The shape is decorative and hidden from assistive technology. The written
  * label beside it carries the meaning, so severity never depends on colour.
  */
-function Shape({ shape, color }: { shape: SeverityShape; color: string }) {
+function Shape({ shape, score }: { shape: SeverityShape; score: SeverityScore }) {
+  // var(), not a literal, so the fill follows the active theme.
+  const color = `var(--color-sev${score})`;
   if (shape === "triangle") {
     return (
       <span
@@ -57,7 +59,7 @@ export function SeverityBadge({
   const meta = severityMeta(score);
   return (
     <span className="inline-flex items-center gap-2">
-      <Shape shape={meta.shape} color={meta.color} />
+      <Shape shape={meta.shape} score={score} />
       <span>
         {variant === "full" ? meta.label : meta.shortLabel} ({score} of 3)
       </span>

@@ -9,14 +9,13 @@ import {
   type GeoJSONSource,
   type MapLayerMouseEvent,
 } from "maplibre-gl";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { type SeverityProfile, type SeverityScore } from "@/lib/obstacles";
 import { SEVERITY_LEVELS, severityFor, type Report } from "@/lib/reports";
 import { parseCenter, parseZoom, type Bbox } from "@/lib/viewport";
 import { CROSS_PATH } from "@/components/icons";
-
-const STYLE_URL = "https://tiles.openfreemap.org/styles/dark";
+import { MAP_STYLE_URL, type Theme } from "@/lib/theme";
 
 // MapLibre resolves its own module worker to the app root under Next's bundler,
 // which returns HTML and leaves the map with a canvas but no style, and no error
@@ -55,6 +54,8 @@ interface MapProps {
   /** Fires after a user-driven move settles. Programmatic pans do not fire it. */
   onBoundsChange: (bbox: Bbox) => void;
   onSelect: (id: string) => void;
+  /** Swaps the basemap. A light interface over a dark basemap reads as broken. */
+  theme: Theme;
   /**
    * Dismisses the map. Rendered into MapLibre's own control stack so it sits with
    * the zoom buttons rather than floating over the canvas separately.
@@ -171,6 +172,7 @@ export default function Map({
   onBoundsChange,
   onSelect,
   onHideMap,
+  theme,
 }: MapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -182,12 +184,23 @@ export default function Map({
   const onPickLocationRef = useRef(onPickLocation);
   const onHideMapRef = useRef(onHideMap);
   const pickingRef = useRef(pickingLocation);
+  const installLayersRef = useRef<(() => void) | null>(null);
+  /**
+   * installLayers is created once inside the mount effect but called again after
+   * every restyle, so it has to read the live theme rather than the one captured
+   * when the map was built, or the rebuilt layers come back in the old colours.
+   */
+  const themeRef = useRef(theme);
+  const styleUrlRef = useRef(MAP_STYLE_URL[theme]);
+  /** Bumped after a restyle so the data effects below repush into fresh sources. */
+  const [styleEpoch, setStyleEpoch] = useState(0);
 
   onBoundsChangeRef.current = onBoundsChange;
   onSelectRef.current = onSelect;
   onPickLocationRef.current = onPickLocation;
   onHideMapRef.current = onHideMap;
   pickingRef.current = pickingLocation;
+  themeRef.current = theme;
 
   const emitBounds = useCallback(() => {
     const map = mapRef.current;
@@ -207,7 +220,7 @@ export default function Map({
 
     const map = new MapLibreMap({
       container: containerRef.current,
-      style: STYLE_URL,
+      style: MAP_STYLE_URL[themeRef.current],
       center: parseCenter(process.env.NEXT_PUBLIC_DEFAULT_CENTER),
       zoom: parseZoom(process.env.NEXT_PUBLIC_DEFAULT_ZOOM),
       // The canvas is decorative and the list is the keyboard surface, so the
@@ -245,7 +258,13 @@ export default function Map({
       "top-right",
     );
 
-    map.on("load", () => {
+    const installLayers = () => {
+      const marks = themeRef.current === "light" ? "light" : "dark";
+      const fill = (level: SeverityScore) =>
+        marks === "light" ? SEVERITY_LEVELS[level].colorLight : SEVERITY_LEVELS[level].color;
+      const rim = (level: SeverityScore) =>
+        marks === "light" ? SEVERITY_LEVELS[level].outlineLight : SEVERITY_LEVELS[level].outline;
+
       // Added first so the pins, added below, paint over the line.
       map.addSource(SOURCE_DIRECT, { type: "geojson", data: lineFeature([]) });
       map.addLayer({
@@ -254,7 +273,7 @@ export default function Map({
         source: SOURCE_DIRECT,
         layout: { "line-cap": "round", "line-join": "round" },
         paint: {
-          "line-color": "#8d8677",
+          "line-color": marks === "light" ? "#6f6b62" : "#8d8677",
           "line-width": 3,
           "line-dasharray": [2, 2],
         },
@@ -267,7 +286,7 @@ export default function Map({
         source: SOURCE_ROUTE,
         layout: { "line-cap": "round", "line-join": "round" },
         paint: {
-          "line-color": "#5fa8a0",
+          "line-color": marks === "light" ? "#1c6b62" : "#5fa8a0",
           "line-width": 5,
         },
       });
@@ -288,18 +307,12 @@ export default function Map({
             (level) => SEVERITY_LEVELS[level].radius,
             SEVERITY_LEVELS[0].radius,
           ),
-          "circle-color": severityMatch(
-            (level) => SEVERITY_LEVELS[level].color,
-            SEVERITY_LEVELS[0].color,
-          ),
+          "circle-color": severityMatch(fill, fill(0)),
           "circle-stroke-width": severityMatch(
             (level) => SEVERITY_LEVELS[level].outlineWidth,
             SEVERITY_LEVELS[0].outlineWidth,
           ),
-          "circle-stroke-color": severityMatch(
-            (level) => SEVERITY_LEVELS[level].outline,
-            SEVERITY_LEVELS[0].outline,
-          ),
+          "circle-stroke-color": severityMatch(rim, rim(0)),
         },
       });
 
@@ -317,7 +330,7 @@ export default function Map({
           ),
           "circle-color": "rgba(0,0,0,0)",
           "circle-stroke-width": 2.5,
-          "circle-stroke-color": "#f2c14e",
+          "circle-stroke-color": marks === "light" ? "#8a5a00" : "#f2c14e",
         },
       });
 
@@ -333,10 +346,15 @@ export default function Map({
           "circle-radius": 9,
           "circle-color": "rgba(0,0,0,0)",
           "circle-stroke-width": 3,
-          "circle-stroke-color": "#f2c14e",
+          "circle-stroke-color": marks === "light" ? "#8a5a00" : "#f2c14e",
         },
       });
+    };
 
+    installLayersRef.current = installLayers;
+
+    map.on("load", () => {
+      installLayers();
       readyRef.current = true;
       map.getContainer().dataset.ready = "true";
       emitBounds();
@@ -395,13 +413,30 @@ export default function Map({
     };
   }, [emitBounds]);
 
+  // Swapping the basemap discards every source and layer, so they are rebuilt and
+  // the data is pushed again once the new style settles.
+  useEffect(() => {
+    const map = mapRef.current;
+    const nextStyle = MAP_STYLE_URL[theme];
+    if (!map || !readyRef.current || styleUrlRef.current === nextStyle) return;
+
+    styleUrlRef.current = nextStyle;
+    readyRef.current = false;
+    map.setStyle(nextStyle);
+    map.once("styledata", () => {
+      installLayersRef.current?.();
+      readyRef.current = true;
+      setStyleEpoch((epoch) => epoch + 1);
+    });
+  }, [theme]);
+
   // Push report data into the source whenever it or the active profile changes.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
     const source = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
     source?.setData(toFeatureCollection(reports, profile));
-  }, [reports, profile]);
+  }, [reports, profile, styleEpoch]);
 
   // Push route geometry and frame it. Framing is a programmatic move, so it must
   // not trigger a refetch.
@@ -422,7 +457,7 @@ export default function Map({
     );
     programmaticRef.current = true;
     map.fitBounds(bounds, { padding: 48, duration: prefersReducedMotion() ? 0 : 400 });
-  }, [routeGeometry, directGeometry]);
+  }, [routeGeometry, directGeometry, styleEpoch]);
 
   // Centre on a chosen route step.
   useEffect(() => {
@@ -459,7 +494,7 @@ export default function Map({
           ]
         : [],
     });
-  }, [pickedPoint]);
+  }, [pickedPoint, styleEpoch]);
 
   // Mirror the selection and pan to it.
   useEffect(() => {
@@ -478,7 +513,7 @@ export default function Map({
     } else {
       map.easeTo({ center: [target.lng, target.lat], duration: 400 });
     }
-  }, [selectedId, reports]);
+  }, [selectedId, reports, styleEpoch]);
 
   return (
     <div

@@ -4,43 +4,87 @@
 @import "maplibre-gl/dist/maplibre-gl.css";
 
 @theme {
-  /* Dark ground, warm off-white ink. No pure white anywhere. */
-  --color-ground: #14161a;
-  --color-panel: #1b1e23;
-  --color-raised: #23272e;
-  --color-ink: #f4f0e8;
-  --color-ink-muted: #b8b2a4;
-
-  /* Boundaries meet 3:1 against the panel. Hairlines are decorative only. */
-  --color-line: #7a818a;
-  --color-hairline: #33383f;
-
-  --color-focus: #f2c14e;
-
-  /* Severity fills, paired with a shape and a written label everywhere. */
-  --color-sev0: #6f6a5e;
-  --color-sev1: #c9a227;
-  --color-sev2: #d1662b;
-  --color-sev3: #b3332b;
+  /* Tailwind generates its utilities from these. The values live in the themed
+     blocks below, so bg-panel and text-ink follow the active theme. */
+  --color-ground: var(--ground);
+  --color-panel: var(--panel);
+  --color-raised: var(--raised);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-line: var(--line);
+  --color-hairline: var(--hairline);
+  --color-focus: var(--focus);
+  --color-sev0: var(--sev0);
+  --color-sev1: var(--sev1);
+  --color-sev2: var(--sev2);
+  --color-sev3: var(--sev3);
 
   --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-serif), ui-serif, Georgia, serif;
 }
 
-/* Frosted surfaces.
-   Requested explicitly, and worth recording that this is the one place the
-   project rules are broken on purpose: CLAUDE.md says no glass effects, and
-   "liquid glass" is number 8 on the global list of tells. The alpha floor is
-   deliberately high so text contrast survives whatever ends up behind the
-   surface, which is what usually goes wrong with glass. No drop shadow either:
-   depth comes from a hairline border and one top highlight. */
-:root {
+/* Dark, the default. Warm off-white ink on a near-black ground, never pure
+   white either way. */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --ground: #14161a;
+  --panel: #1b1e23;
+  --raised: #23272e;
+  --ink: #f4f0e8;
+  --ink-muted: #b8b2a4;
+  --line: #7a818a;
+  --hairline: #33383f;
+  --focus: #f2c14e;
+
+  --sev0: #8d8677;
+  --sev1: #c9a227;
+  --sev2: #d1662b;
+  --sev3: #cf4034;
+
   --glass-fill: color-mix(in srgb, #262b33 88%, transparent);
   --glass-fill-hover: color-mix(in srgb, #2e343d 92%, transparent);
   --glass-fill-strong: color-mix(in srgb, #333a44 94%, transparent);
   --glass-edge: color-mix(in srgb, #f4f0e8 44%, transparent);
   --glass-top: color-mix(in srgb, #f4f0e8 12%, transparent);
+  --glass-edge-hover: color-mix(in srgb, #f4f0e8 62%, transparent);
+  --primary-fill: color-mix(in srgb, #33301f 92%, transparent);
+  --primary-fill-hover: color-mix(in srgb, #474030 92%, transparent);
+  --field-fill: color-mix(in srgb, #101215 70%, transparent);
 }
+
+/* Light. Warm paper rather than white, and the severity fills are darkened so
+   they still clear 3:1 against it as map marks. */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --ground: #f2efe7;
+  --panel: #e9e5db;
+  --raised: #ded9cd;
+  --ink: #22252a;
+  --ink-muted: #55524b;
+  --line: #6f6b62;
+  --hairline: #c6c0b3;
+  --focus: #8a5a00;
+
+  --sev0: #5f5b52;
+  --sev1: #8a6d0a;
+  --sev2: #a2451a;
+  --sev3: #8f1f18;
+
+  --glass-fill: color-mix(in srgb, #fbf9f4 82%, transparent);
+  --glass-fill-hover: color-mix(in srgb, #ffffff 78%, transparent);
+  --glass-fill-strong: color-mix(in srgb, #d5cfc1 92%, transparent);
+  --glass-edge: color-mix(in srgb, #22252a 62%, transparent);
+  --glass-top: color-mix(in srgb, #ffffff 55%, transparent);
+  --glass-edge-hover: color-mix(in srgb, #22252a 82%, transparent);
+  --primary-fill: color-mix(in srgb, #f7e6bd 92%, transparent);
+  --primary-fill-hover: color-mix(in srgb, #f2d99a 94%, transparent);
+  --field-fill: color-mix(in srgb, #fdfcf8 88%, transparent);
+}
+
+
 
 body {
   background: var(--color-ground);
@@ -119,7 +163,7 @@ body {
 
 .btn:hover:not(:disabled) {
   background-color: var(--glass-fill-hover);
-  border-color: color-mix(in srgb, #f4f0e8 62%, transparent);
+  border-color: var(--glass-edge-hover);
 }
 
 .btn:active:not(:disabled) {
@@ -141,11 +185,11 @@ body {
    reads as primary without competing with the map. */
 .btn-primary:not(:disabled) {
   border-color: var(--color-focus);
-  background-color: color-mix(in srgb, #33301f 92%, transparent);
+  background-color: var(--primary-fill);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background-color: color-mix(in srgb, #474030 92%, transparent);
+  background-color: var(--primary-fill-hover);
   border-color: var(--color-focus);
 }
 
@@ -154,7 +198,7 @@ body {
   font-size: 0.8125rem;
   font-family: var(--font-sans);
   color: var(--color-ink);
-  background-color: color-mix(in srgb, #101215 70%, transparent);
+  background-color: var(--field-fill);
   border: 1px solid var(--color-line);
   border-radius: 3px;
 }
@@ -255,6 +299,11 @@ summary.maplibregl-ctrl-attrib-button {
 }
 
 .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: none;
+}
+
+:root[data-theme="dark"] .maplibregl-ctrl-group button .maplibregl-ctrl-icon,
+:root:not([data-theme]) .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
   filter: invert(1) hue-rotate(180deg);
 }
 

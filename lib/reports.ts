@@ -106,10 +106,14 @@ export interface SeverityMeta {
   /** Compact label used in list rows. */
   shortLabel: string;
   shape: SeverityShape;
-  /** Map circle fill. */
+  /** Map circle fill, dark theme. */
   color: string;
-  /** Map circle outline. */
+  /** Map circle fill, light theme. Darkened to clear 3:1 on a pale basemap. */
+  colorLight: string;
+  /** Map circle outline, dark theme. */
   outline: string;
+  /** Map circle outline, light theme. */
+  outlineLight: string;
   /** Map circle radius at mid zoom, in pixels. Monotonic with severity. */
   radius: number;
   /** Map circle outline width, in pixels. Monotonic with severity. */
@@ -122,8 +126,10 @@ export const SEVERITY_LEVELS: Record<SeverityScore, SeverityMeta> = {
     label: "No impact",
     shortLabel: "No impact",
     shape: "bar",
-    color: "#6f6a5e",
+    color: "#8d8677",
+    colorLight: "#5f5b52",
     outline: "#a8a294",
+    outlineLight: "#2c2a25",
     radius: 4,
     outlineWidth: 1,
   },
@@ -133,7 +139,9 @@ export const SEVERITY_LEVELS: Record<SeverityScore, SeverityMeta> = {
     shortLabel: "Minor",
     shape: "square",
     color: "#c9a227",
+    colorLight: "#8a6d0a",
     outline: "#efe3bd",
+    outlineLight: "#2c2a25",
     radius: 5.5,
     outlineWidth: 1.5,
   },
@@ -143,7 +151,9 @@ export const SEVERITY_LEVELS: Record<SeverityScore, SeverityMeta> = {
     shortLabel: "Difficult",
     shape: "diamond",
     color: "#d1662b",
+    colorLight: "#a2451a",
     outline: "#f6dcc6",
+    outlineLight: "#2c2a25",
     radius: 7,
     outlineWidth: 2.5,
   },
@@ -152,8 +162,10 @@ export const SEVERITY_LEVELS: Record<SeverityScore, SeverityMeta> = {
     label: "Impassable",
     shortLabel: "Impassable",
     shape: "triangle",
-    color: "#b3332b",
+    color: "#cf4034",
+    colorLight: "#8f1f18",
     outline: "#f4f0e8",
+    outlineLight: "#2c2a25",
     radius: 8.5,
     outlineWidth: 3.5,
   },

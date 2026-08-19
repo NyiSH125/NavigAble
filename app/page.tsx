@@ -15,6 +15,8 @@ import ReportDetail from "@/components/ReportDetail";
 import ReportList from "@/components/ReportList";
 import { SeverityLegend } from "@/components/SeverityBadge";
 import { MapGlyph } from "@/components/icons";
+import ThemeToggle from "@/components/ThemeToggle";
+import { isTheme, THEME_STORAGE_KEY, type Theme } from "@/lib/theme";
 import { MapSkeleton, ReportListSkeleton } from "@/components/Skeleton";
 
 // MapLibre touches window at import time, so it never runs on the server. The
@@ -47,6 +49,11 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null);
 
   const [mapVisible, setMapVisible] = useState(false);
+  /**
+   * Mirrors the attribute the head script already set before paint. Held in state
+   * only so the basemap and the toggle label can react to it.
+   */
+  const [theme, setTheme] = useState<Theme>("dark");
   const [reportOpen, setReportOpen] = useState(false);
   const [routeOpen, setRouteOpen] = useState(false);
 
@@ -111,6 +118,30 @@ export default function Page() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
+  }, []);
+
+  // Read back what the head script decided, and follow the system setting while
+  // the visitor has not made an explicit choice.
+  useEffect(() => {
+    const current = document.documentElement.dataset.theme;
+    if (isTheme(current)) setTheme(current);
+
+    const query = window.matchMedia("(prefers-color-scheme: light)");
+    const follow = (event: MediaQueryListEvent) => {
+      let stored: string | null = null;
+      try {
+        stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+      } catch {
+        stored = null;
+      }
+      if (isTheme(stored)) return;
+      const next: Theme = event.matches ? "light" : "dark";
+      document.documentElement.dataset.theme = next;
+      document.documentElement.style.colorScheme = next;
+      setTheme(next);
+    };
+    query.addEventListener("change", follow);
+    return () => query.removeEventListener("change", follow);
   }, []);
 
   // Wide screens open with the map showing, narrow ones with the list alone.
@@ -284,12 +315,15 @@ export default function Page() {
         Skip to reports
       </a>
 
-      <header className="flex items-baseline justify-between gap-4 border-b border-line px-4 py-3">
+      <header className="flex items-center justify-between gap-4 border-b border-line px-4 py-3">
         <h1 className="wordmark">NavigAble</h1>
-        <p className="text-xs text-ink-muted">
-          Accessibility obstacles near you. The list is the full record, the map is a
-          picture of it.
-        </p>
+        <div className="flex items-center gap-4">
+          <p className="lede hidden max-w-sm text-right sm:block">
+            Accessibility obstacles near you. The list is the full record, the map is a
+            picture of it.
+          </p>
+          <ThemeToggle theme={theme} onChange={setTheme} />
+        </div>
       </header>
 
       <p aria-live="polite" role="status" className="sr-only">
@@ -450,6 +484,7 @@ export default function Page() {
             pickedPoint={pickedPoint}
             onPickLocation={handlePickLocation}
             onHideMap={hideMap}
+            theme={theme}
             onBoundsChange={handleBoundsChange}
             onSelect={setSelectedId}
           />
