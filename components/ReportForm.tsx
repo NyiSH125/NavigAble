@@ -8,6 +8,11 @@ import { ReportDetailSkeleton } from "@/components/Skeleton";
 
 interface ReportFormProps {
   onCreated: (report: Report) => void;
+  /** True while the map is in location-picking mode. */
+  picking: boolean;
+  onPickingChange: (picking: boolean) => void;
+  /** The point most recently clicked on the map, or null. */
+  pickedPoint: { lat: number; lng: number } | null;
 }
 
 type Status = "idle" | "preparing" | "analyzing" | "success" | "error";
@@ -106,7 +111,12 @@ async function prepareImage(
   }
 }
 
-export default function ReportForm({ onCreated }: ReportFormProps) {
+export default function ReportForm({
+  onCreated,
+  picking,
+  onPickingChange,
+  pickedPoint,
+}: ReportFormProps) {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [coords, setCoords] = useState<Coords | null>(null);
@@ -127,6 +137,19 @@ export default function ReportForm({ onCreated }: ReportFormProps) {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
+
+  useEffect(() => {
+    if (!pickedPoint) return;
+    setCoords({ lat: pickedPoint.lat, lng: pickedPoint.lng, source: "manual" });
+    setManualLat(pickedPoint.lat.toFixed(5));
+    setManualLng(pickedPoint.lng.toFixed(5));
+    setGeoMessage(
+      `Using the point you chose on the map: ${pickedPoint.lat.toFixed(5)}, ${pickedPoint.lng.toFixed(5)}.`,
+    );
+    setAnnouncement(
+      `Location set from the map: ${pickedPoint.lat.toFixed(5)}, ${pickedPoint.lng.toFixed(5)}. Edit the coordinate fields to adjust it.`,
+    );
+  }, [pickedPoint]);
 
   const pickFile = (next: File | null) => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -322,14 +345,34 @@ export default function ReportForm({ onCreated }: ReportFormProps) {
         <legend className="text-sm font-semibold tracking-wide uppercase">Location</legend>
         <p className="mt-1 text-xs text-ink-muted">{geoMessage}</p>
 
-        <button
-          type="button"
-          onClick={useDeviceLocation}
-          disabled={busy}
-          className="mt-2 border border-line px-2 py-1 text-xs"
-        >
-          Use my location
-        </button>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={useDeviceLocation}
+            disabled={busy}
+            className="border border-line px-2 py-1 text-xs"
+          >
+            Use my location
+          </button>
+          {/* Clicking the map is a shortcut for mouse users. The button itself is
+              keyboard reachable, and whatever it produces lands in the coordinate
+              fields below, which stay the editable source of truth. */}
+          <button
+            type="button"
+            onClick={() => onPickingChange(!picking)}
+            aria-pressed={picking}
+            disabled={busy}
+            className="border border-line px-2 py-1 text-xs"
+          >
+            {picking ? "Stop choosing on map" : "Choose on map"}
+          </button>
+        </div>
+        {picking ? (
+          <p className="mt-2 border border-hairline px-2 py-1.5 text-xs">
+            Click the spot on the map. The coordinates appear below and can be edited
+            by hand.
+          </p>
+        ) : null}
 
         <div className="mt-3 flex flex-wrap items-end gap-2">
           <span className="flex flex-col">

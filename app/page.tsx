@@ -55,6 +55,8 @@ export default function Page() {
   const [routeError, setRouteError] = useState<string | null>(null);
   const [selectedStep, setSelectedStep] = useState<number | null>(null);
   const [focusPoint, setFocusPoint] = useState<LngLat | null>(null);
+  const [picking, setPicking] = useState(false);
+  const [pickedPoint, setPickedPoint] = useState<LngLat | null>(null);
   /** Bumped after a successful submission to refetch the current viewport. */
   const [refreshToken, setRefreshToken] = useState(0);
 
@@ -181,6 +183,18 @@ export default function Page() {
     setRefreshToken((token) => token + 1);
   }, []);
 
+  const handlePickingChange = useCallback((next: boolean) => {
+    setPicking(next);
+    // The map is behind a toggle on small screens, so asking to choose a point on
+    // it has to reveal it, otherwise the instruction is impossible to follow.
+    if (next) setMapVisible(true);
+  }, []);
+
+  const handlePickLocation = useCallback((point: LngLat) => {
+    setPickedPoint(point);
+    setPicking(false);
+  }, []);
+
   const handleBackToList = useCallback(() => {
     if (selectedId) itemRefs.current.get(selectedId)?.focus();
   }, [selectedId]);
@@ -226,7 +240,12 @@ export default function Page() {
           <div className="border-b border-line">
             <button
               type="button"
-              onClick={() => setReportOpen((open) => !open)}
+              onClick={() => {
+                setReportOpen((open) => {
+                  if (open) setPicking(false);
+                  return !open;
+                });
+              }}
               aria-expanded={reportOpen}
               aria-controls="report-form-panel"
               className="w-full px-4 py-3 text-left text-sm font-semibold tracking-wide uppercase"
@@ -239,7 +258,14 @@ export default function Page() {
           </div>
 
           <div id="report-form-panel" hidden={!reportOpen}>
-            {reportOpen ? <ReportForm onCreated={handleCreated} /> : null}
+            {reportOpen ? (
+              <ReportForm
+                onCreated={handleCreated}
+                picking={picking}
+                onPickingChange={handlePickingChange}
+                pickedPoint={pickedPoint}
+              />
+            ) : null}
           </div>
 
           <div className="border-b border-line">
@@ -339,6 +365,9 @@ export default function Page() {
             routeGeometry={route?.geometry ?? null}
             directGeometry={directRoute?.geometry ?? null}
             focusPoint={focusPoint}
+            pickingLocation={picking}
+            pickedPoint={pickedPoint}
+            onPickLocation={handlePickLocation}
             onBoundsChange={handleBoundsChange}
             onSelect={setSelectedId}
           />

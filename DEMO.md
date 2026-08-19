@@ -43,8 +43,9 @@ confidence. Point out that severity is never colour alone: every level has a
 shape and a written label.
 
 **1:20 File a report live.** Open **Report an obstacle**, take a photo of
-something in the room that is a walkway, entrance, or crossing, tap **Use my
-location**, and submit. It comes back classified for all four profiles and lands
+something that is a walkway, entrance, or crossing, then set the location one of
+three ways: **Use my location** on a phone, **Choose on map** and click the spot,
+or type coordinates. Then submit. It comes back classified for all four profiles and lands
 on the map.
 
 - Classification usually takes 3 to 8 seconds, and can take up to 35 under load.

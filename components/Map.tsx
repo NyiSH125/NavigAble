@@ -29,6 +29,8 @@ const SOURCE_ROUTE = "route";
 const LAYER_ROUTE = "route-line";
 const SOURCE_DIRECT = "route-direct";
 const LAYER_DIRECT = "route-direct-line";
+const SOURCE_PICK = "picked-point";
+const LAYER_PICK = "picked-point-marker";
 
 interface MapProps {
   reports: Report[];
@@ -40,6 +42,15 @@ interface MapProps {
   directGeometry?: Array<[number, number]> | null;
   /** A point to centre on, used when a route step is selected. */
   focusPoint?: { lng: number; lat: number } | null;
+  /**
+   * When true, a click anywhere on the map reports a location instead of
+   * selecting a pin. A convenience for mouse users: the coordinate fields and the
+   * device location button remain the keyboard paths to the same result.
+   */
+  pickingLocation?: boolean;
+  /** The location chosen so far, drawn as a marker. */
+  pickedPoint?: { lng: number; lat: number } | null;
+  onPickLocation?: (point: { lng: number; lat: number }) => void;
   /** Fires after a user-driven move settles. Programmatic pans do not fire it. */
   onBoundsChange: (bbox: Bbox) => void;
   onSelect: (id: string) => void;
@@ -106,6 +117,9 @@ export default function Map({
   routeGeometry = null,
   directGeometry = null,
   focusPoint = null,
+  pickingLocation = false,
+  pickedPoint = null,
+  onPickLocation,
   onBoundsChange,
   onSelect,
 }: MapProps) {
@@ -116,9 +130,13 @@ export default function Map({
   const programmaticRef = useRef(false);
   const onBoundsChangeRef = useRef(onBoundsChange);
   const onSelectRef = useRef(onSelect);
+  const onPickLocationRef = useRef(onPickLocation);
+  const pickingRef = useRef(pickingLocation);
 
   onBoundsChangeRef.current = onBoundsChange;
   onSelectRef.current = onSelect;
+  onPickLocationRef.current = onPickLocation;
+  pickingRef.current = pickingLocation;
 
   const emitBounds = useCallback(() => {
     const map = mapRef.current;
@@ -248,6 +266,22 @@ export default function Map({
         },
       });
 
+      map.addSource(SOURCE_PICK, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
+      map.addLayer({
+        id: LAYER_PICK,
+        type: "circle",
+        source: SOURCE_PICK,
+        paint: {
+          "circle-radius": 9,
+          "circle-color": "rgba(0,0,0,0)",
+          "circle-stroke-width": 3,
+          "circle-stroke-color": "#f2c14e",
+        },
+      });
+
       readyRef.current = true;
       map.getContainer().dataset.ready = "true";
       emitBounds();
@@ -269,15 +303,22 @@ export default function Map({
     // Clicking a pin is a convenience for mouse users. The list is the
     // canonical way to select, so nothing here is keyboard-only functionality.
     map.on("click", LAYER_PINS, (event: MapLayerMouseEvent) => {
+      if (pickingRef.current) return;
       const id = event.features?.[0]?.properties?.id;
       if (typeof id === "string") onSelectRef.current(id);
     });
 
+    // Any click while picking reports a location, including on top of a pin.
+    map.on("click", (event: MapLayerMouseEvent) => {
+      if (!pickingRef.current) return;
+      onPickLocationRef.current?.({ lng: event.lngLat.lng, lat: event.lngLat.lat });
+    });
+
     map.on("mouseenter", LAYER_PINS, () => {
-      map.getCanvas().style.cursor = "pointer";
+      if (!pickingRef.current) map.getCanvas().style.cursor = "pointer";
     });
     map.on("mouseleave", LAYER_PINS, () => {
-      map.getCanvas().style.cursor = "";
+      if (!pickingRef.current) map.getCanvas().style.cursor = "";
     });
 
     // The map pane is hidden behind a toggle on small screens, so the container
@@ -339,6 +380,31 @@ export default function Map({
       map.easeTo({ center: [focusPoint.lng, focusPoint.lat], duration: 350 });
     }
   }, [focusPoint]);
+
+  // Crosshair makes the picking mode visible rather than only announced.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.getCanvas().style.cursor = pickingLocation ? "crosshair" : "";
+  }, [pickingLocation]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !readyRef.current) return;
+    const source = map.getSource(SOURCE_PICK) as GeoJSONSource | undefined;
+    source?.setData({
+      type: "FeatureCollection",
+      features: pickedPoint
+        ? [
+            {
+              type: "Feature",
+              properties: {},
+              geometry: { type: "Point", coordinates: [pickedPoint.lng, pickedPoint.lat] },
+            },
+          ]
+        : [],
+    });
+  }, [pickedPoint]);
 
   // Mirror the selection and pan to it.
   useEffect(() => {
