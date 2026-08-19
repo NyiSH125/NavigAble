@@ -407,7 +407,7 @@ export default function ReportForm({
 
           {/* Dropping is an extra, never the only way in. */}
           <p className="mt-2 text-xs text-ink-muted">
-            {dragActive ? "Release to use this photo." : "You can also drag a photo here."}
+            {dragActive ? "Release to use this photo." : "Drag & Drop a photo"}
           </p>
 
           {fileError ? <p className="mt-2 text-xs">{fileError}</p> : null}
