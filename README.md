@@ -55,7 +55,12 @@ Uploads are written by the service role from server code only. Browsers never
 hold the service role key, so a public bucket is readable but not writable from
 the client.
 
-Seeded example rows are written to `seed-fake/` inside the bucket and can be
+Before launch, strip EXIF from uploads. Photos submitted through the app keep
+whatever metadata the camera wrote, including GPS, and the report already carries
+its own coordinates so the embedded copy is redundant risk.
+
+User submissions land under `user/` in the bucket. Seeded example rows are written
+to `seed-fake/` and can be
 removed with `npx tsx scripts/seed-fake.ts --reset`.
 
 ## Environment

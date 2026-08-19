@@ -7,6 +7,7 @@ import { type ObstacleType, type SeverityProfile } from "@/lib/obstacles";
 import { DEFAULT_PROFILE, profileMeta, type Report } from "@/lib/reports";
 import { initialBbox, parseCenter, type Bbox } from "@/lib/viewport";
 import ObstacleFilters from "@/components/ObstacleFilters";
+import ReportForm from "@/components/ReportForm";
 import ReportDetail from "@/components/ReportDetail";
 import ReportList from "@/components/ReportList";
 import { MapSkeleton, ReportListSkeleton } from "@/components/Skeleton";
@@ -41,6 +42,9 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null);
 
   const [mapVisible, setMapVisible] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  /** Bumped after a successful submission to refetch the current viewport. */
+  const [refreshToken, setRefreshToken] = useState(0);
 
   const itemRefs = useRef(new Map<string, HTMLButtonElement | null>());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -81,7 +85,7 @@ export default function Page() {
       });
 
     return () => controller.abort();
-  }, [bbox, selectedTypes]);
+  }, [bbox, selectedTypes, refreshToken]);
 
   useEffect(() => {
     return () => {
@@ -98,6 +102,18 @@ export default function Page() {
   useEffect(() => {
     if (selectedId && !loading && !selectedReport) setSelectedId(null);
   }, [selectedId, selectedReport, loading]);
+
+  const handleCreated = useCallback((created: Report) => {
+    // Insert optimistically before refetching. Without this, selecting the new
+    // id while `reports` still holds the previous list makes the "selection fell
+    // out of results" effect below clear it again before the refetch lands.
+    // It also puts the pin and the row on screen immediately.
+    setReports((current) =>
+      current.some((report) => report.id === created.id) ? current : [created, ...current],
+    );
+    setSelectedId(created.id);
+    setRefreshToken((token) => token + 1);
+  }, []);
 
   const handleBackToList = useCallback(() => {
     if (selectedId) itemRefs.current.get(selectedId)?.focus();
@@ -141,6 +157,25 @@ export default function Page() {
           id="reports-panel"
           className="order-1 flex min-h-0 flex-1 flex-col overflow-y-auto border-line lg:max-w-md lg:border-r lg:order-1"
         >
+          <div className="border-b border-line">
+            <button
+              type="button"
+              onClick={() => setReportOpen((open) => !open)}
+              aria-expanded={reportOpen}
+              aria-controls="report-form-panel"
+              className="w-full px-4 py-3 text-left text-sm font-semibold tracking-wide uppercase"
+            >
+              {reportOpen ? "Close reporting form" : "Report an obstacle"}
+              <span className="mt-0.5 block text-xs font-normal normal-case tracking-normal text-ink-muted">
+                Photograph what is in the way. It is classified for all four profiles.
+              </span>
+            </button>
+          </div>
+
+          <div id="report-form-panel" hidden={!reportOpen}>
+            {reportOpen ? <ReportForm onCreated={handleCreated} /> : null}
+          </div>
+
           <ObstacleFilters
             profile={profile}
             onProfileChange={setProfile}

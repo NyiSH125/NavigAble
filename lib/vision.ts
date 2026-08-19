@@ -421,7 +421,18 @@ function translateError(error: unknown): never {
 export interface AnalyzeObstacleOptions {
   /** Aborts the provider call. */
   signal?: AbortSignal;
+  /**
+   * Extra attempts after a retryable provider failure. Only overload (503, 500,
+   * 504) is retried: quota will not clear in seconds, and a safety block or a
+   * schema mismatch will not change on the same input.
+   */
+  retries?: number;
 }
+
+/** Backoff before each retry, in milliseconds. */
+const RETRY_DELAYS_MS = [900, 2400, 5000];
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Classifies one photograph of the pedestrian environment.
@@ -438,6 +449,29 @@ export async function analyzeObstacle(
   imageBase64: string,
   mediaType: string,
   options: AnalyzeObstacleOptions = {},
+): Promise<ObstacleAnalysis> {
+  const retries = options.retries ?? 2;
+
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await analyzeOnce(imageBase64, mediaType, options);
+    } catch (error) {
+      const retryable = error instanceof TransientUpstreamError;
+      if (!retryable || attempt >= retries) throw error;
+      const delay = RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)];
+      console.warn(
+        `[vision] ${MODEL_ID} unavailable, retrying in ${delay}ms (attempt ${attempt + 2} of ${retries + 1})`,
+      );
+      await sleep(delay);
+      if (options.signal?.aborted) throw error;
+    }
+  }
+}
+
+async function analyzeOnce(
+  imageBase64: string,
+  mediaType: string,
+  options: AnalyzeObstacleOptions,
 ): Promise<ObstacleAnalysis> {
   const data = imageBase64.replace(/^data:[^;,]+;base64,/, "").trim();
   if (data === "") {

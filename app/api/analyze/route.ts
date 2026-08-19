@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { clientIp, createRateLimiter } from "@/lib/rate-limit";
 import {
   MissingFunctionCallError,
   RateLimitError,
@@ -17,51 +18,13 @@ export const runtime = "nodejs";
 /** Largest accepted base64 payload. */
 const MAX_PAYLOAD_BYTES = 5 * 1024 * 1024;
 
-/** Per-IP request cap and the window it applies over. */
+/** Per-IP request cap, over a one minute window. */
 const RATE_LIMIT = 10;
-const WINDOW_MS = 60_000;
 
-/**
- * In-memory sliding window, keyed by client IP. This is per server instance and
- * resets on redeploy, which is fine for a first pass but does not hold across
- * multiple instances. Move to a shared store before running more than one.
- */
-const hits = new Map<string, number[]>();
-
-function clientIp(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  return request.headers.get("x-real-ip")?.trim() || "unknown";
-}
-
-/** Returns null when the request is allowed, or the seconds until it will be. */
-function rateLimit(ip: string, now: number): number | null {
-  const cutoff = now - WINDOW_MS;
-
-  // Opportunistic sweep so idle keys do not accumulate.
-  for (const [key, stamps] of hits) {
-    const live = stamps.filter((at) => at > cutoff);
-    if (live.length === 0) hits.delete(key);
-    else hits.set(key, live);
-  }
-
-  const recent = hits.get(ip) ?? [];
-  if (recent.length >= RATE_LIMIT) {
-    const oldest = recent[0];
-    return Math.max(1, Math.ceil((oldest + WINDOW_MS - now) / 1000));
-  }
-
-  recent.push(now);
-  hits.set(ip, recent);
-  return null;
-}
+const limiter = createRateLimiter({ limit: RATE_LIMIT });
 
 export async function POST(request: Request) {
-  const ip = clientIp(request);
-  const retryAfter = rateLimit(ip, Date.now());
+  const retryAfter = limiter.check(clientIp(request));
   if (retryAfter !== null) {
     return NextResponse.json(
       {
