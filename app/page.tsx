@@ -14,6 +14,7 @@ import type { LngLat } from "@/lib/routing";
 import ReportDetail from "@/components/ReportDetail";
 import ReportList from "@/components/ReportList";
 import { SeverityLegend } from "@/components/SeverityBadge";
+import { MapGlyph } from "@/components/icons";
 import { MapSkeleton, ReportListSkeleton } from "@/components/Skeleton";
 
 // MapLibre touches window at import time, so it never runs on the server. The
@@ -63,6 +64,9 @@ export default function Page() {
 
   const itemRefs = useRef(new Map<string, HTMLButtonElement | null>());
   const reportToggleRef = useRef<HTMLButtonElement | null>(null);
+  const showMapRef = useRef<HTMLButtonElement | null>(null);
+  /** Which control to hand focus to after the map toggle swaps it out. */
+  const focusAfterToggle = useRef<"show" | "hide" | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const registerItemRef = useCallback((id: string, node: HTMLButtonElement | null) => {
@@ -107,6 +111,54 @@ export default function Page() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
+  }, []);
+
+  // Wide screens open with the map showing, narrow ones with the list alone.
+  // Done in an effect rather than during render so the server and the client
+  // agree on the first pass.
+  useEffect(() => {
+    if (window.matchMedia("(min-width: 1024px)").matches) setMapVisible(true);
+  }, []);
+
+  /**
+   * The show button and the on-map close button replace one another, so whichever
+   * was just activated has left the document. Without this, focus falls to the
+   * body and a keyboard user loses their place.
+   */
+  useEffect(() => {
+    const target = focusAfterToggle.current;
+    if (!target) return;
+
+    let frames = 0;
+    const attempt = () => {
+      const node =
+        target === "show"
+          ? showMapRef.current
+          : document.querySelector<HTMLButtonElement>('#map-pane button[data-hide-map="true"]');
+      if (node) {
+        node.focus();
+        focusAfterToggle.current = null;
+        return;
+      }
+      // The map is dynamically imported, so its controls can appear a beat late.
+      // Only that direction needs to wait.
+      if (frames++ < 30) requestAnimationFrame(attempt);
+      else focusAfterToggle.current = null;
+    };
+    // Try straight away: the show button exists in the same commit, so deferring
+    // it would park focus on the body for a noticeable beat.
+    attempt();
+  }, [mapVisible]);
+
+  const showMap = useCallback(() => {
+    focusAfterToggle.current = "hide";
+    setMapVisible(true);
+  }, []);
+
+  const hideMap = useCallback(() => {
+    focusAfterToggle.current = "show";
+    setMapVisible(false);
+    setPicking(false);
   }, []);
 
   // Re-routes whenever the endpoints or the profile change. The profile is part
@@ -326,20 +378,23 @@ export default function Page() {
             onTypesChange={setSelectedTypes}
           />
 
-          <div className="lg:hidden">
+          {!mapVisible ? (
             <button
               type="button"
-              onClick={() => setMapVisible((visible) => !visible)}
-              aria-expanded={mapVisible}
+              ref={showMapRef}
+              onClick={showMap}
               aria-controls="map-pane"
               className="w-full border-b border-line px-4 py-3 text-left text-sm"
             >
-              {mapVisible ? "Hide map" : "Show map"}
-              <span className="block text-xs text-ink-muted">
+              <span className="flex items-center gap-2">
+                <MapGlyph />
+                Show map
+              </span>
+              <span className="lede mt-0.5 block">
                 The map is a visual aid. Everything it shows is in the list below.
               </span>
             </button>
-          </div>
+          ) : null}
 
           <div className="shrink-0 border-b border-hairline px-4 py-4">
             <SeverityLegend />
@@ -382,7 +437,7 @@ export default function Page() {
 
         <div
           id="map-pane"
-          className={`order-2 min-h-0 flex-1 ${mapVisible ? "block" : "hidden"} lg:block`}
+          className={`order-2 min-h-0 flex-1 ${mapVisible ? "block" : "hidden"}`}
         >
           <MapCanvas
             reports={reports}
@@ -394,6 +449,7 @@ export default function Page() {
             pickingLocation={picking}
             pickedPoint={pickedPoint}
             onPickLocation={handlePickLocation}
+            onHideMap={hideMap}
             onBoundsChange={handleBoundsChange}
             onSelect={setSelectedId}
           />

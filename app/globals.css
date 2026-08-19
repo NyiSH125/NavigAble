@@ -242,6 +242,14 @@ summary.maplibregl-ctrl-attrib-button {
   background-color: var(--glass-fill-hover);
 }
 
+/* MapLibre ships a blue focus ring, which is off palette. Match the rest of the
+   interface instead. */
+.maplibregl-ctrl-group button:focus:focus-visible {
+  box-shadow: none;
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
 .maplibregl-ctrl-group button + button {
   border-top: 1px solid var(--glass-edge);
 }

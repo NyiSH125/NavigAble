@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { type SeverityProfile, type SeverityScore } from "@/lib/obstacles";
 import { SEVERITY_LEVELS, severityFor, type Report } from "@/lib/reports";
 import { parseCenter, parseZoom, type Bbox } from "@/lib/viewport";
+import { CROSS_PATH } from "@/components/icons";
 
 const STYLE_URL = "https://tiles.openfreemap.org/styles/dark";
 
@@ -54,6 +55,53 @@ interface MapProps {
   /** Fires after a user-driven move settles. Programmatic pans do not fire it. */
   onBoundsChange: (bbox: Bbox) => void;
   onSelect: (id: string) => void;
+  /**
+   * Dismisses the map. Rendered into MapLibre's own control stack so it sits with
+   * the zoom buttons rather than floating over the canvas separately.
+   */
+  onHideMap?: () => void;
+}
+
+/**
+ * A close button in the top-right control cluster, above the zoom pair.
+ *
+ * Built imperatively because MapLibre owns that corner: adding it as a control
+ * means it inherits the same group styling and stacking as the zoom buttons for
+ * free, instead of being positioned on top of them and drifting out of
+ * alignment.
+ */
+class HideMapControl {
+  private container?: HTMLDivElement;
+  private button?: HTMLButtonElement;
+
+  constructor(private readonly hide: () => void) {}
+
+  onAdd(): HTMLElement {
+    const container = document.createElement("div");
+    container.className = "maplibregl-ctrl maplibregl-ctrl-group";
+
+    const button = document.createElement("button");
+    button.type = "button";
+    // Icon-only, so the name has to be supplied explicitly.
+    button.setAttribute("aria-label", "Hide map");
+    button.title = "Hide map";
+    button.dataset.hideMap = "true";
+    button.innerHTML =
+      `<svg width="15" height="15" viewBox="0 0 19 19" fill="none" stroke="currentColor" ` +
+      `stroke-width="1.6" stroke-linecap="round" aria-hidden="true" focusable="false">` +
+      `<path d="${CROSS_PATH}"/></svg>`;
+    button.addEventListener("click", () => this.hide());
+
+    container.appendChild(button);
+    this.container = container;
+    this.button = button;
+    return container;
+  }
+
+  onRemove(): void {
+    this.button?.remove();
+    this.container?.remove();
+  }
 }
 
 function toFeatureCollection(
@@ -122,6 +170,7 @@ export default function Map({
   onPickLocation,
   onBoundsChange,
   onSelect,
+  onHideMap,
 }: MapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -131,11 +180,13 @@ export default function Map({
   const onBoundsChangeRef = useRef(onBoundsChange);
   const onSelectRef = useRef(onSelect);
   const onPickLocationRef = useRef(onPickLocation);
+  const onHideMapRef = useRef(onHideMap);
   const pickingRef = useRef(pickingLocation);
 
   onBoundsChangeRef.current = onBoundsChange;
   onSelectRef.current = onSelect;
   onPickLocationRef.current = onPickLocation;
+  onHideMapRef.current = onHideMap;
   pickingRef.current = pickingLocation;
 
   const emitBounds = useCallback(() => {
@@ -184,6 +235,10 @@ export default function Map({
     canvasContainer.removeAttribute("role");
     canvasContainer.removeAttribute("aria-label");
     canvasContainer.setAttribute("tabindex", "-1");
+
+    if (onHideMapRef.current) {
+      map.addControl(new HideMapControl(() => onHideMapRef.current?.()), "top-right");
+    }
 
     map.addControl(
       new NavigationControl({ showCompass: false, visualizePitch: false }),
