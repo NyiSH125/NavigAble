@@ -1,16 +1,111 @@
 @import "tailwindcss";
+/* MapLibre's own stylesheet, imported here rather than from the component so
+   the overrides at the bottom of this file reliably come after it. */
+@import "maplibre-gl/dist/maplibre-gl.css";
 
-:root {
-  --background: #14161a;
-  --foreground: #f4f0e8;
-}
+@theme {
+  /* Dark ground, warm off-white ink. No pure white anywhere. */
+  --color-ground: #14161a;
+  --color-panel: #1b1e23;
+  --color-raised: #23272e;
+  --color-ink: #f4f0e8;
+  --color-ink-muted: #b8b2a4;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  /* Boundaries meet 3:1 against the panel. Hairlines are decorative only. */
+  --color-line: #7a818a;
+  --color-hairline: #33383f;
+
+  --color-focus: #f2c14e;
+
+  /* Severity fills, paired with a shape and a written label everywhere. */
+  --color-sev0: #6f6a5e;
+  --color-sev1: #c9a227;
+  --color-sev2: #d1662b;
+  --color-sev3: #b3332b;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--color-ground);
+  color: var(--color-ink);
+  font-family: ui-sans-serif, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Focus is never hidden and never relies on colour alone: the ring is offset
+   so the shape of the focused element changes too. */
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* Only for elements that manage focus programmatically and would otherwise
+   show a ring on mouse click. Keyboard focus still shows above. */
+[data-focus-quiet]:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.skeleton {
+  background-color: var(--color-raised);
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
+/* MapLibre ships a light theme with rounded corners. Bring it in line with the
+   dark ground and the 4px radius ceiling. Attribution stays visible and
+   focusable: it is a licence requirement, not decoration. */
+.maplibregl-ctrl.maplibregl-ctrl-attrib,
+.maplibregl-ctrl-attrib.maplibregl-compact {
+  background-color: color-mix(in srgb, var(--color-panel) 88%, transparent);
+  border-radius: 3px;
+  color: var(--color-ink-muted);
+  font-size: 11px;
+}
+
+.maplibregl-ctrl-attrib a {
+  color: var(--color-ink);
+  text-decoration: underline;
+}
+
+.maplibregl-ctrl-attrib-button,
+summary.maplibregl-ctrl-attrib-button {
+  background-color: var(--color-raised);
+  border-radius: 3px;
+}
+
+.maplibregl-ctrl-group,
+.maplibregl-ctrl.maplibregl-ctrl-group,
+.maplibregl-ctrl.maplibregl-ctrl-group:not(:empty) {
+  background-color: var(--color-panel);
+  border: 1px solid var(--color-line);
+  border-radius: 3px;
+  box-shadow: none;
+}
+
+.maplibregl-ctrl-group button,
+.maplibregl-ctrl-group button:not(:disabled):hover {
+  background-color: var(--color-panel);
+  border-radius: 0;
+}
+
+.maplibregl-ctrl-group button + button {
+  border-top: 1px solid var(--color-hairline);
+}
+
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: invert(1) hue-rotate(180deg);
 }

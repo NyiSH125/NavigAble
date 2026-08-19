@@ -1,3 +1,214 @@
+"use client";
+
+import dynamic from "next/dynamic";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { type ObstacleType, type SeverityProfile } from "@/lib/obstacles";
+import { DEFAULT_PROFILE, profileMeta, type Report } from "@/lib/reports";
+import { initialBbox, parseCenter, type Bbox } from "@/lib/viewport";
+import ObstacleFilters from "@/components/ObstacleFilters";
+import ReportDetail from "@/components/ReportDetail";
+import ReportList from "@/components/ReportList";
+import { MapSkeleton, ReportListSkeleton } from "@/components/Skeleton";
+
+// MapLibre touches window at import time, so it never runs on the server. The
+// skeleton is the loading state, not a spinner.
+const MapCanvas = dynamic(() => import("@/components/Map"), {
+  ssr: false,
+  loading: () => <MapSkeleton />,
+});
+
+/** Wait for panning to settle before refetching. */
+const MOVE_DEBOUNCE_MS = 350;
+
+function bboxParam(bbox: Bbox): string {
+  return [bbox.minLng, bbox.minLat, bbox.maxLng, bbox.maxLat]
+    .map((n) => n.toFixed(6))
+    .join(",");
+}
+
 export default function Page() {
-  return <main>NavigAble</main>;
+  const [profile, setProfile] = useState<SeverityProfile>(DEFAULT_PROFILE);
+  const [selectedTypes, setSelectedTypes] = useState<ObstacleType[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [bbox, setBbox] = useState<Bbox>(() =>
+    initialBbox(parseCenter(process.env.NEXT_PUBLIC_DEFAULT_CENTER)),
+  );
+
+  const [reports, setReports] = useState<Report[]>([]);
+  const [truncated, setTruncated] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [mapVisible, setMapVisible] = useState(false);
+
+  const itemRefs = useRef(new Map<string, HTMLButtonElement | null>());
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const registerItemRef = useCallback((id: string, node: HTMLButtonElement | null) => {
+    if (node) itemRefs.current.set(id, node);
+    else itemRefs.current.delete(id);
+  }, []);
+
+  const handleBoundsChange = useCallback((next: Bbox) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setBbox(next), MOVE_DEBOUNCE_MS);
+  }, []);
+
+  // Fetch whenever the viewport or the type filter changes.
+  useEffect(() => {
+    const controller = new AbortController();
+    const params = new URLSearchParams({ bbox: bboxParam(bbox) });
+    if (selectedTypes.length > 0) params.set("types", selectedTypes.join(","));
+
+    setLoading(true);
+    setError(null);
+
+    fetch(`/api/reports?${params.toString()}`, { signal: controller.signal })
+      .then(async (response) => {
+        const body = await response.json();
+        if (!response.ok) throw new Error(body?.message ?? "Could not load reports.");
+        setReports(body.reports as Report[]);
+        setTruncated(Boolean(body.truncated));
+      })
+      .catch((cause: unknown) => {
+        if (cause instanceof DOMException && cause.name === "AbortError") return;
+        setError(cause instanceof Error ? cause.message : "Could not load reports.");
+        setReports([]);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [bbox, selectedTypes]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  const selectedReport = useMemo(
+    () => reports.find((report) => report.id === selectedId) ?? null,
+    [reports, selectedId],
+  );
+
+  // Drop a selection that has fallen out of the current results.
+  useEffect(() => {
+    if (selectedId && !loading && !selectedReport) setSelectedId(null);
+  }, [selectedId, selectedReport, loading]);
+
+  const handleBackToList = useCallback(() => {
+    if (selectedId) itemRefs.current.get(selectedId)?.focus();
+  }, [selectedId]);
+
+  // One live region for the whole workspace, so state changes are announced
+  // once rather than by each pane separately.
+  const status = error
+    ? `Could not load reports. ${error}`
+    : loading
+      ? "Loading reports"
+      : `${reports.length} ${reports.length === 1 ? "report" : "reports"} in view, severity shown for the ${profileMeta(profile).label.toLowerCase()} profile${
+          selectedReport ? ". Report selected, detail panel updated" : ""
+        }`;
+
+  return (
+    <div className="flex h-dvh flex-col bg-ground text-ink">
+      <a
+        href="#reports-panel"
+        className="absolute top-0 left-0 z-20 -translate-y-full bg-raised px-3 py-2 text-sm focus:translate-y-0"
+      >
+        Skip to reports
+      </a>
+
+      <header className="flex items-baseline justify-between gap-4 border-b border-line px-4 py-3">
+        <h1 className="text-base font-semibold tracking-wide">NavigAble</h1>
+        <p className="text-xs text-ink-muted">
+          Accessibility obstacles near you. The list is the full record, the map is a
+          picture of it.
+        </p>
+      </header>
+
+      <p aria-live="polite" role="status" className="sr-only">
+        {status}
+      </p>
+
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        {/* The list pane comes first in the DOM on every screen size, so the
+            keyboard path never runs through the map. */}
+        <div
+          id="reports-panel"
+          className="order-1 flex min-h-0 flex-1 flex-col overflow-y-auto border-line lg:max-w-md lg:border-r lg:order-1"
+        >
+          <ObstacleFilters
+            profile={profile}
+            onProfileChange={setProfile}
+            selectedTypes={selectedTypes}
+            onTypesChange={setSelectedTypes}
+          />
+
+          <div className="lg:hidden">
+            <button
+              type="button"
+              onClick={() => setMapVisible((visible) => !visible)}
+              aria-expanded={mapVisible}
+              aria-controls="map-pane"
+              className="w-full border-b border-line px-4 py-3 text-left text-sm"
+            >
+              {mapVisible ? "Hide map" : "Show map"}
+              <span className="block text-xs text-ink-muted">
+                The map is a visual aid. Everything it shows is in the list below.
+              </span>
+            </button>
+          </div>
+
+          {error ? (
+            <div className="border-b border-line px-4 py-3">
+              <p className="text-sm">Could not load reports.</p>
+              <p className="mt-1 text-xs text-ink-muted">{error}</p>
+              <button
+                type="button"
+                onClick={() => setBbox((current) => ({ ...current }))}
+                className="mt-2 border border-line px-2 py-1 text-xs"
+              >
+                Try again
+              </button>
+            </div>
+          ) : loading ? (
+            <div className="border-b border-hairline">
+              <p className="px-4 py-3 text-sm text-ink-muted">Loading reports</p>
+              <ReportListSkeleton />
+            </div>
+          ) : (
+            <ReportList
+              reports={reports}
+              profile={profile}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              registerItemRef={registerItemRef}
+              truncated={truncated}
+            />
+          )}
+
+          {selectedReport ? (
+            <ReportDetail report={selectedReport} onBackToList={handleBackToList} />
+          ) : null}
+        </div>
+
+        <div
+          id="map-pane"
+          className={`order-2 min-h-0 flex-1 ${mapVisible ? "block" : "hidden"} lg:block`}
+        >
+          <MapCanvas
+            reports={reports}
+            profile={profile}
+            selectedId={selectedId}
+            onBoundsChange={handleBoundsChange}
+            onSelect={setSelectedId}
+          />
+        </div>
+      </div>
+    </div>
+  );
 }

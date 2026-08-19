@@ -31,38 +31,29 @@ const MAX_OUTPUT_TOKENS = 4096;
 
 // Provider-agnostic types ---------------------------------------------------
 
-export const OBSTACLE_TYPES = [
-  "stairs_only_entrance",
-  "curb_no_cut",
-  "broken_pavement",
-  "blocked_ramp",
-  "narrow_passage",
-  "construction",
-  "no_tactile_paving",
-  "steep_grade",
-  "no_handrail",
-  "none",
-] as const;
+// The domain vocabulary lives in lib/obstacles.ts so client components can use
+// it without importing a provider SDK. Re-exported here so callers of this
+// module keep a single import site.
+import {
+  OBSTACLE_TYPES,
+  PERMANENCE_VALUES,
+  SEVERITY_PROFILES,
+  type ObstacleType,
+  type Permanence,
+  type SeverityByProfile,
+  type SeverityScore,
+} from "./obstacles";
 
-export type ObstacleType = (typeof OBSTACLE_TYPES)[number];
-
-export const PERMANENCE_VALUES = ["permanent", "temporary"] as const;
-
-export type Permanence = (typeof PERMANENCE_VALUES)[number];
-
-export const SEVERITY_PROFILES = [
-  "wheelchair",
-  "blind",
-  "low_vision",
-  "walker",
-] as const;
-
-export type SeverityProfile = (typeof SEVERITY_PROFILES)[number];
-
-/** 0 = no impact, 1 = minor inconvenience, 2 = difficult and possibly unsafe, 3 = impassable. */
-export type SeverityScore = 0 | 1 | 2 | 3;
-
-export type SeverityByProfile = Record<SeverityProfile, SeverityScore>;
+export {
+  OBSTACLE_TYPES,
+  PERMANENCE_VALUES,
+  SEVERITY_PROFILES,
+  type ObstacleType,
+  type Permanence,
+  type SeverityByProfile,
+  type SeverityProfile,
+  type SeverityScore,
+} from "./obstacles";
 
 export interface ObstacleAnalysis {
   is_accessibility_relevant: boolean;
