@@ -1,6 +1,6 @@
 # NavigAble demo runbook
 
-**URL:** `TODO paste the Vercel URL here after deploying`
+**URL:** https://navig-able-kappa.vercel.app
 
 **Backup recording:** `TODO path or link to the 60 second capture`
 
