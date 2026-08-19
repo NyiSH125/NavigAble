@@ -271,3 +271,17 @@ summary.maplibregl-ctrl-attrib-button {
     backdrop-filter: blur(12px) saturate(130%);
   }
 }
+
+/* MapLibre's own control buttons centre a block-level background image. A raw
+   inline svg instead sits on the text baseline, which left the close glyph high
+   and slightly left inside its 29px box. */
+.maplibregl-ctrl-group button[data-hide-map] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.maplibregl-ctrl-group button[data-hide-map] svg {
+  display: block;
+}
