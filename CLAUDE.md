@@ -24,4 +24,9 @@ Accessibility obstacle map. Users photograph obstacles, a vision model classifie
 ### Code rules
 - Server-side secrets never imported into client components.
 - All model calls go through app/api routes, never from the browser.
-- Vision model: claude-sonnet-5, forced tool call for structured output. Never parse JSON out of prose.
+- Model for every call, vision and text: Gemini, using the current Flash model id from Google AI Studio. Read the id from an env var or a single constant. Never hardcode a version string guessed from memory.
+- The provider lives behind `analyzeObstacle()` in `lib/vision.ts`. No caller anywhere imports a provider SDK directly, and the exported types stay provider-agnostic. Swapping providers must be a one-file change.
+- Structured output always comes from a forced function call (`functionCallingConfig` mode ANY) or `responseSchema` with `responseMimeType: application/json`. Never parse JSON out of prose.
+- Set the output token budget to at least 4096 on any structured-output call. Current models spend part of that budget on internal reasoning, so a tight limit truncates the structured result and the failure looks like malformed output rather than truncation. Keep the thinking budget low on the high-volume classifier.
+- Check the response's finish reason and any prompt-blocked signal before reading content. A safety block returns a normal HTTP 200 with empty or partial content, so indexing straight into the result throws on a case that is not an error.
+- Free-tier quota is a real failure mode at seeding volume. Surface 429 as a typed RateLimitError so batch jobs can back off and resume instead of dying.
