@@ -218,7 +218,7 @@ export default function RoutePlanner({
       </div>
 
       {loading ? (
-        <div className="border border-hairline">
+        <div className="box">
           <p className="px-3 pt-3 text-sm text-ink-muted">Finding a route</p>
           <ReportListSkeleton rows={4} />
         </div>

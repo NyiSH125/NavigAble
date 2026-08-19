@@ -72,7 +72,7 @@ export default function ReportDetail({ report, onBackToList }: ReportDetailProps
 
       <div className="px-4 py-3">
         {photoFailed ? (
-          <p className="border border-hairline bg-raised p-3 text-sm text-ink-muted">
+          <p className="box bg-raised p-3 text-sm text-ink-muted">
             The photo for this report could not be loaded. Description: {description}
           </p>
         ) : (
@@ -86,7 +86,7 @@ export default function ReportDetail({ report, onBackToList }: ReportDetailProps
             height={600}
             loading="lazy"
             onError={() => setPhotoFailed(true)}
-            className="w-full border border-hairline object-cover"
+            className="box w-full object-cover"
             style={{ aspectRatio: "4 / 3" }}
           />
         )}

@@ -81,7 +81,7 @@ export default function RouteSteps({
         </dl>
 
         {direct && extra !== null ? (
-          <p className="mt-2 border border-hairline px-2 py-1.5 text-xs">
+          <p className="box mt-2 px-2 py-1.5 text-xs">
             {extra > 0
               ? `${extra} metres longer than the direct route, which passes ${route.avoidedCount} ${route.avoidedCount === 1 ? "obstacle" : "obstacles"} this profile cannot use.`
               : extra < 0

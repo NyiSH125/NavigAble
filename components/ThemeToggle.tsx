@@ -11,12 +11,13 @@ interface ThemeToggleProps {
 /**
  * Switches between the two themes and remembers the choice.
  *
- * The label names the destination rather than the current state, because "Dark"
- * alone is ambiguous about whether it describes what you have or what you would
- * get. The glyph is decorative; the text carries the meaning.
+ * Icon-only, so the name is supplied explicitly and states the destination rather
+ * than the current state: "Dark" alone is ambiguous about whether it describes
+ * what you have or what you would get.
  */
 export default function ThemeToggle({ theme, onChange }: ThemeToggleProps) {
   const next: Theme = theme === "dark" ? "light" : "dark";
+  const label = next === "light" ? "Switch to the light theme" : "Switch to the dark theme";
 
   const apply = () => {
     document.documentElement.dataset.theme = next;
@@ -30,9 +31,14 @@ export default function ThemeToggle({ theme, onChange }: ThemeToggleProps) {
   };
 
   return (
-    <button type="button" onClick={apply} className="btn shrink-0">
+    <button
+      type="button"
+      onClick={apply}
+      aria-label={label}
+      title={label}
+      className="btn btn-icon shrink-0"
+    >
       {next === "light" ? <SunGlyph /> : <MoonGlyph />}
-      {next === "light" ? "Light theme" : "Dark theme"}
     </button>
   );
 }

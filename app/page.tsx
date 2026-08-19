@@ -315,13 +315,36 @@ export default function Page() {
         Skip to reports
       </a>
 
-      <header className="flex items-center justify-between gap-4 border-b border-line px-4 py-3">
+      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line px-4 py-3">
         <h1 className="wordmark">NavigAble</h1>
-        <div className="flex items-center gap-4">
-          <p className="lede hidden max-w-sm text-right sm:block">
-            Accessibility obstacles near you. The list is the full record, the map is a
-            picture of it.
-          </p>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            ref={reportToggleRef}
+            onClick={() => {
+              setReportOpen((open) => {
+                if (open) setPicking(false);
+                return !open;
+              });
+            }}
+            aria-expanded={reportOpen}
+            aria-controls="report-form-panel"
+            className="btn"
+          >
+            {reportOpen ? "Close reporting form" : "Report an obstacle"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setRouteOpen((open) => !open)}
+            aria-expanded={routeOpen}
+            aria-controls="route-planner-panel"
+            className="btn"
+          >
+            {routeOpen ? "Close route planner" : "Plan a route"}
+          </button>
+
           <ThemeToggle theme={theme} onChange={setTheme} />
         </div>
       </header>
@@ -337,29 +360,6 @@ export default function Page() {
           id="reports-panel"
           className="order-1 flex min-h-0 flex-1 flex-col overflow-y-auto border-line lg:max-w-md lg:border-r lg:order-1"
         >
-          <div className="border-b border-line">
-            <button
-              type="button"
-              ref={reportToggleRef}
-              onClick={() => {
-                setReportOpen((open) => {
-                  if (open) setPicking(false);
-                  return !open;
-                });
-              }}
-              aria-expanded={reportOpen}
-              aria-controls="report-form-panel"
-              className="w-full px-4 py-3 text-left"
-            >
-              <span className="heading block">
-                {reportOpen ? "Close reporting form" : "Report an obstacle"}
-              </span>
-              <span className="lede mt-0.5 block">
-                Photograph what is in the way. It is classified for all four profiles.
-              </span>
-            </button>
-          </div>
-
           <div id="report-form-panel" hidden={!reportOpen}>
             {reportOpen ? (
               <ReportForm
@@ -370,23 +370,6 @@ export default function Page() {
                 onDone={handleReportDone}
               />
             ) : null}
-          </div>
-
-          <div className="border-b border-line">
-            <button
-              type="button"
-              onClick={() => setRouteOpen((open) => !open)}
-              aria-expanded={routeOpen}
-              aria-controls="route-planner-panel"
-              className="w-full px-4 py-3 text-left"
-            >
-              <span className="heading block">
-                {routeOpen ? "Close route planner" : "Plan a route"}
-              </span>
-              <span className="lede mt-0.5 block">
-                Routes around obstacles that block your profile.
-              </span>
-            </button>
           </div>
 
           <div id="route-planner-panel" hidden={!routeOpen}>

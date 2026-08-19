@@ -391,7 +391,7 @@ export default function ReportForm({
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
           onDrop={onDrop}
-          className={`mt-2 border p-3 ${dragActive ? "border-focus bg-raised" : "border-hairline"}`}
+          className={`box mt-2 p-3 ${dragActive ? "border-focus bg-raised" : ""}`}
         >
           <button
             type="button"
@@ -423,7 +423,7 @@ export default function ReportForm({
             alt={
               result?.ai_description ?? (file ? `Selected photo, ${file.name}` : "Selected photo")
             }
-            className="w-full border border-hairline object-cover"
+            className="box w-full object-cover"
             style={{ aspectRatio: "4 / 3" }}
           />
           <figcaption className="mt-1.5 text-xs text-ink-muted">
@@ -459,7 +459,7 @@ export default function ReportForm({
           </button>
         </div>
         {picking ? (
-          <p className="mt-2 border border-hairline px-2 py-1.5 text-xs">
+          <p className="box mt-2 px-2 py-1.5 text-xs">
             Click the spot on the map. The coordinates appear below and can be edited
             by hand.
           </p>
@@ -525,7 +525,7 @@ export default function ReportForm({
       {prepNote && busy ? <p className="text-xs text-ink-muted">{prepNote}</p> : null}
 
       {busy ? (
-        <div className="border border-hairline">
+        <div className="box">
           <p className="px-3 pt-3 text-sm text-ink-muted">
             {status === "preparing" ? "Preparing the photo" : "Analysing the photo"}
           </p>
