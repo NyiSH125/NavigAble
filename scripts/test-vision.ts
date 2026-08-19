@@ -15,6 +15,7 @@ import {
   RateLimitError,
   SafetyBlockError,
   SchemaMismatchError,
+  TransientUpstreamError,
   VisionError,
   analyzeObstacle,
   type ObstacleAnalysis,
@@ -122,6 +123,12 @@ async function main(): Promise<void> {
         `Rate limited. ${error.message}${
           error.retryAfterSeconds ? ` Retry after ${error.retryAfterSeconds}s.` : ""
         }`,
+      );
+      return;
+    }
+    if (error instanceof TransientUpstreamError) {
+      console.error(
+        `Provider temporarily unavailable${error.status ? ` (${error.status})` : ""}. ${error.message}`,
       );
       return;
     }

@@ -5,6 +5,7 @@ import {
   RateLimitError,
   SafetyBlockError,
   SchemaMismatchError,
+  TransientUpstreamError,
   VisionConfigError,
   VisionError,
   analyzeObstacle,
@@ -145,6 +146,13 @@ export async function POST(request: Request) {
             ? { "Retry-After": String(error.retryAfterSeconds) }
             : undefined,
         },
+      );
+    }
+    if (error instanceof TransientUpstreamError) {
+      // Retryable upstream. Tell the client so, rather than reporting a bug.
+      return NextResponse.json(
+        { error: "upstream_unavailable", message: error.message, retryable: true },
+        { status: 503, headers: { "Retry-After": "5" } },
       );
     }
     if (error instanceof SafetyBlockError) {

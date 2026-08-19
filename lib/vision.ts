@@ -104,6 +104,20 @@ export class RateLimitError extends VisionError {
 }
 
 /**
+ * The provider is temporarily unavailable or overloaded (HTTP 503, 500, 504).
+ * Retryable on the same input, unlike the other failures here, so batch jobs
+ * should retry with backoff rather than dropping the row.
+ */
+export class TransientUpstreamError extends VisionError {
+  readonly status?: number;
+
+  constructor(message: string, status?: number, options?: { cause?: unknown }) {
+    super(message, options);
+    this.status = status;
+  }
+}
+
+/**
  * The prompt or the image tripped a safety filter. This arrives as a normal
  * HTTP 200 with empty or partial content, so it has to be detected before
  * reading the result.
@@ -394,6 +408,20 @@ function translateError(error: unknown): never {
     );
   }
 
+  // Model overload and gateway failures are retryable on the same input.
+  if (
+    status === 503 ||
+    status === 500 ||
+    status === 504 ||
+    /UNAVAILABLE|high demand|overloaded|INTERNAL|DEADLINE_EXCEEDED/i.test(text)
+  ) {
+    throw new TransientUpstreamError(
+      `Gemini is temporarily unavailable for ${MODEL_ID}. Retry with backoff.`,
+      status,
+      { cause: error },
+    );
+  }
+
   throw new VisionError(`Gemini request failed: ${text}`, { cause: error });
 }
 
@@ -410,6 +438,7 @@ export interface AnalyzeObstacleOptions {
  * @param imageBase64 Base64-encoded image bytes, with or without a data: URL prefix.
  * @param mediaType   IANA media type, for example image/jpeg.
  * @throws RateLimitError on provider quota exhaustion (429).
+ * @throws TransientUpstreamError on provider overload (503, 500, 504). Retryable.
  * @throws SafetyBlockError when the prompt or the image is blocked.
  * @throws MissingFunctionCallError when the model skips the forced call.
  * @throws SchemaMismatchError when the returned arguments do not validate.
