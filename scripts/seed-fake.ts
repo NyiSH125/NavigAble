@@ -2,8 +2,12 @@
  * Seeds six fabricated reports so the map and list are testable before real
  * data exists.
  *
- *   npx tsx scripts/seed-fake.ts            insert, skipping rows already there
- *   npx tsx scripts/seed-fake.ts --reset    delete previous fake rows first
+ *   npx tsx scripts/seed-fake.ts                     insert, skipping duplicates
+ *   npx tsx scripts/seed-fake.ts --reset             remove previous fake rows first
+ *   npx tsx scripts/seed-fake.ts --center=lng,lat    move the whole set somewhere
+ *
+ * The centre matters for a demo: the rows have to sit where the map opens. Pass
+ * the same point to NEXT_PUBLIC_DEFAULT_CENTER so the two agree.
  *
  * The rows are deliberately marked: photo_url points at seed-fake/ inside the
  * reports bucket and reporter_id is "seed-fake", so they are easy to find and
@@ -18,6 +22,9 @@ import { createClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 
 import { type ObstacleType, type Permanence, type SeverityScore } from "../lib/obstacles";
+
+/** Where the fabricated set is centred by default, matching NEXT_PUBLIC_DEFAULT_CENTER. */
+const DEFAULT_CENTER: [number, number] = [-122.04584, 37.3193];
 
 const BUCKET = "reports";
 const PREFIX = "seed-fake";
@@ -154,6 +161,35 @@ const FAKE_REPORTS: FakeReport[] = [
   },
 ];
 
+/** Parses --center=lng,lat. Falls back to the built-in centre. */
+function parseCenterArg(argv: string[]): { center: [number, number]; explicit: boolean } {
+  const arg = argv.find((value) => value.startsWith("--center="));
+  if (!arg) return { center: DEFAULT_CENTER, explicit: false };
+  const parts = arg.slice("--center=".length).split(",").map((part) => Number(part.trim()));
+  if (parts.length !== 2 || parts.some((n) => !Number.isFinite(n))) {
+    throw new Error(`Could not read ${arg}. Expected --center=lng,lat`);
+  }
+  const [lng, lat] = parts;
+  if (lng < -180 || lng > 180 || lat < -90 || lat > 90) {
+    throw new Error(`--center is out of range: ${lng},${lat}`);
+  }
+  return { center: [lng, lat], explicit: true };
+}
+
+/**
+ * Moves a seeded point by the offset between the two centres, so relocating the
+ * set preserves the spacing between obstacles rather than piling them up.
+ */
+function relocate(
+  report: FakeReport,
+  center: [number, number],
+): { lat: number; lng: number } {
+  return {
+    lng: report.lng - DEFAULT_CENTER[0] + center[0],
+    lat: report.lat - DEFAULT_CENTER[1] + center[1],
+  };
+}
+
 async function loadEnvLocal(): Promise<void> {
   let text: string;
   try {
@@ -181,7 +217,7 @@ async function placeholderJpeg(report: FakeReport): Promise<Buffer> {
   <rect x="24" y="24" width="752" height="552" fill="none" stroke="#7a818a" stroke-width="2"/>
   <text x="48" y="96" font-family="Georgia, serif" font-size="20" fill="#b8b2a4">Seeded example, not a real photograph</text>
   <text x="48" y="168" font-family="Georgia, serif" font-size="44" fill="#f4f0e8">${report.caption}</text>
-  <text x="48" y="232" font-family="Georgia, serif" font-size="22" fill="#b8b2a4">${report.lat.toFixed(4)}, ${report.lng.toFixed(4)}</text>
+  <text x="48" y="232" font-family="Georgia, serif" font-size="22" fill="#b8b2a4">${report.permanence === "temporary" ? "Temporary obstruction" : "Permanent feature"}</text>
   <text x="48" y="540" font-family="Georgia, serif" font-size="18" fill="#7a818a">${report.slug}</text>
 </svg>`;
   return sharp(Buffer.from(svg)).jpeg({ quality: 82 }).toBuffer();
@@ -201,6 +237,21 @@ async function main(): Promise<void> {
   }
 
   const reset = process.argv.includes("--reset");
+
+  let center: [number, number];
+  let explicitCenter: boolean;
+  try {
+    ({ center, explicit: explicitCenter } = parseCenterArg(process.argv));
+  } catch (error) {
+    console.error((error as Error).message);
+    process.exitCode = 2;
+    return;
+  }
+  console.log(`center : ${center[0]}, ${center[1]}${explicitCenter ? "" : " (default)"}`);
+  if (explicitCenter) {
+    console.log(`         set NEXT_PUBLIC_DEFAULT_CENTER=${center[0]},${center[1]} to match`);
+  }
+  console.log("");
   const supabase = createClient(url, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
@@ -283,9 +334,10 @@ async function main(): Promise<void> {
     }
 
     const [wheelchair, blind, lowVision, walker] = report.sev;
+    const at = relocate(report, center);
     const { error: insertError } = await supabase.from("reports").insert({
-      lat: report.lat,
-      lng: report.lng,
+      lat: at.lat,
+      lng: at.lng,
       heading: report.heading,
       photo_url: publicUrl,
       source: report.source,
@@ -313,7 +365,7 @@ async function main(): Promise<void> {
     }
 
     console.log(
-      `  ${report.slug}: inserted, severity w${wheelchair} b${blind} lv${lowVision} wa${walker}`,
+      `  ${report.slug}: inserted at ${at.lat.toFixed(5)}, ${at.lng.toFixed(5)}, severity w${wheelchair} b${blind} lv${lowVision} wa${walker}`,
     );
     inserted += 1;
   }

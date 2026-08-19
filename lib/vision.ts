@@ -22,6 +22,19 @@ const DEFAULT_MODEL_ID = "gemini-3.7-flash";
 
 export const MODEL_ID = process.env.GEMINI_MODEL_ID || DEFAULT_MODEL_ID;
 
+/**
+ * Tried once if the primary model is still refusing after its retries.
+ *
+ * The Flash models share a quota but not a load queue, and the primary returns
+ * 503 "high demand" in bursts that can outlast a few seconds of backoff. Both ids
+ * come from the current model list, not from memory. Set GEMINI_FALLBACK_MODEL_ID
+ * to an empty string to disable.
+ */
+const DEFAULT_FALLBACK_MODEL_ID = "gemini-3.5-flash";
+
+export const FALLBACK_MODEL_ID =
+  process.env.GEMINI_FALLBACK_MODEL_ID ?? DEFAULT_FALLBACK_MODEL_ID;
+
 const FUNCTION_NAME = "record_obstacle";
 
 // Structured-output calls need headroom. Part of this budget is spent on
@@ -387,13 +400,13 @@ function statusOf(error: unknown): number | undefined {
   return undefined;
 }
 
-function translateError(error: unknown): never {
+function translateError(error: unknown, model: string = MODEL_ID): never {
   const status = statusOf(error);
   const text = error instanceof Error ? error.message : String(error);
 
   if (status === 429 || /RESOURCE_EXHAUSTED|quota|rate limit/i.test(text)) {
     throw new RateLimitError(
-      `Gemini quota exhausted for ${MODEL_ID}. Back off and resume.`,
+      `Gemini quota exhausted for ${model}. Back off and resume.`,
       retryAfterFromError(error),
       { cause: error },
     );
@@ -407,7 +420,7 @@ function translateError(error: unknown): never {
     /UNAVAILABLE|high demand|overloaded|INTERNAL|DEADLINE_EXCEEDED/i.test(text)
   ) {
     throw new TransientUpstreamError(
-      `Gemini is temporarily unavailable for ${MODEL_ID}. Retry with backoff.`,
+      `Gemini is temporarily unavailable for ${model}. Retry with backoff.`,
       status,
       { cause: error },
     );
@@ -452,26 +465,42 @@ export async function analyzeObstacle(
 ): Promise<ObstacleAnalysis> {
   const retries = options.retries ?? 2;
 
-  for (let attempt = 0; ; attempt += 1) {
+  // The primary model, then one shot at the fallback. A burst of overload on the
+  // newest Flash model should not be the reason a report cannot be filed.
+  const plan: string[] = Array.from({ length: retries + 1 }, () => MODEL_ID);
+  if (FALLBACK_MODEL_ID && FALLBACK_MODEL_ID !== MODEL_ID) plan.push(FALLBACK_MODEL_ID);
+
+  for (let attempt = 0; attempt < plan.length; attempt += 1) {
+    const model = plan[attempt];
     try {
-      return await analyzeOnce(imageBase64, mediaType, options);
+      return await analyzeOnce(imageBase64, mediaType, options, model);
     } catch (error) {
-      const retryable = error instanceof TransientUpstreamError;
-      if (!retryable || attempt >= retries) throw error;
+      const retryable =
+        error instanceof TransientUpstreamError || error instanceof RateLimitError;
+      const last = attempt === plan.length - 1;
+      if (!retryable || last) throw error;
+
+      const next = plan[attempt + 1];
       const delay = RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)];
       console.warn(
-        `[vision] ${MODEL_ID} unavailable, retrying in ${delay}ms (attempt ${attempt + 2} of ${retries + 1})`,
+        next === model
+          ? `[vision] ${model} unavailable, retrying in ${delay}ms`
+          : `[vision] ${model} still unavailable, falling back to ${next}`,
       );
       await sleep(delay);
       if (options.signal?.aborted) throw error;
     }
   }
+
+  // Unreachable: the loop either returns or throws on its last attempt.
+  throw new VisionError("Vision request exhausted every model.");
 }
 
 async function analyzeOnce(
   imageBase64: string,
   mediaType: string,
   options: AnalyzeObstacleOptions,
+  model: string = MODEL_ID,
 ): Promise<ObstacleAnalysis> {
   const data = imageBase64.replace(/^data:[^;,]+;base64,/, "").trim();
   if (data === "") {
@@ -488,7 +517,7 @@ async function analyzeOnce(
   let response;
   try {
     response = await ai.models.generateContent({
-      model: MODEL_ID,
+      model,
       contents: [
         {
           role: "user",
@@ -517,7 +546,7 @@ async function analyzeOnce(
       },
     });
   } catch (error) {
-    translateError(error);
+    translateError(error, model);
   }
 
   // A blocked prompt returns HTTP 200 with no candidates, so check the block
