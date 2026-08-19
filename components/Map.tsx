@@ -48,8 +48,8 @@ interface MapProps {
    * device location button remain the keyboard paths to the same result.
    */
   pickingLocation?: boolean;
-  /** The location chosen so far, drawn as a marker. */
-  pickedPoint?: { lng: number; lat: number } | null;
+  /** Locations chosen so far, drawn as rings. One for a report, two for a route. */
+  pickedPoints?: Array<{ lng: number; lat: number }>;
   onPickLocation?: (point: { lng: number; lat: number }) => void;
   /** Fires after a user-driven move settles. Programmatic pans do not fire it. */
   onBoundsChange: (bbox: Bbox) => void;
@@ -167,7 +167,7 @@ export default function Map({
   directGeometry = null,
   focusPoint = null,
   pickingLocation = false,
-  pickedPoint = null,
+  pickedPoints = [],
   onPickLocation,
   onBoundsChange,
   onSelect,
@@ -484,17 +484,14 @@ export default function Map({
     const source = map.getSource(SOURCE_PICK) as GeoJSONSource | undefined;
     source?.setData({
       type: "FeatureCollection",
-      features: pickedPoint
-        ? [
-            {
-              type: "Feature",
-              properties: {},
-              geometry: { type: "Point", coordinates: [pickedPoint.lng, pickedPoint.lat] },
-            },
-          ]
-        : [],
+      features: pickedPoints.map((point) => ({
+        type: "Feature",
+        properties: {},
+        geometry: { type: "Point", coordinates: [point.lng, point.lat] },
+      })),
     });
-  }, [pickedPoint, styleEpoch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- compared by value below
+  }, [JSON.stringify(pickedPoints), styleEpoch]);
 
   // Mirror the selection and pan to it.
   useEffect(() => {

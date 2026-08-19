@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { type SeverityProfile } from "@/lib/obstacles";
 import { DESTINATIONS } from "@/lib/places";
@@ -24,7 +24,15 @@ interface RoutePlannerProps {
   onRequestRoute: (request: RouteRequest) => void;
   onSelectStep: (index: number, at: LngLat) => void;
   onClear: () => void;
+  /** Which end is waiting for a map click, if either. */
+  pickTarget: "routeStart" | "routeEnd" | null;
+  onPickTarget: (target: "routeStart" | "routeEnd" | null) => void;
+  pickedStart: LngLat | null;
+  pickedEnd: LngLat | null;
 }
+
+/** Stands in for the preset list when a point comes from the map or the fields. */
+const CUSTOM_DESTINATION = "custom";
 
 /**
  * Route entry without a geocoder: the device location or typed coordinates for
@@ -41,6 +49,10 @@ export default function RoutePlanner({
   onRequestRoute,
   onSelectStep,
   onClear,
+  pickTarget,
+  onPickTarget,
+  pickedStart,
+  pickedEnd,
 }: RoutePlannerProps) {
   const [start, setStart] = useState<LngLat | null>(null);
   const [startLabel, setStartLabel] = useState("No start set yet.");
@@ -49,8 +61,58 @@ export default function RoutePlanner({
   const [destinationId, setDestinationId] = useState<string>(DESTINATIONS[0]?.id ?? "");
   const [compare, setCompare] = useState(true);
   const [notice, setNotice] = useState("");
+  const [endLat, setEndLat] = useState("");
+  const [endLng, setEndLng] = useState("");
+  const [customEnd, setCustomEnd] = useState<LngLat | null>(null);
 
-  const destination = DESTINATIONS.find((place) => place.id === destinationId) ?? null;
+  const preset = DESTINATIONS.find((place) => place.id === destinationId) ?? null;
+  const destination: LngLat | null = preset
+    ? { lat: preset.lat, lng: preset.lng }
+    : destinationId === CUSTOM_DESTINATION
+      ? customEnd
+      : null;
+
+  // A point chosen on the map fills the same fields the keyboard path uses, so
+  // the two ways of setting an end cannot disagree.
+  useEffect(() => {
+    if (!pickedStart) return;
+    setStart(pickedStart);
+    setStartLat(pickedStart.lat.toFixed(5));
+    setStartLng(pickedStart.lng.toFixed(5));
+    setStartLabel(
+      `Start is the point you chose on the map: ${pickedStart.lat.toFixed(5)}, ${pickedStart.lng.toFixed(5)}.`,
+    );
+    setNotice(
+      `Start set from the map: ${pickedStart.lat.toFixed(5)}, ${pickedStart.lng.toFixed(5)}.`,
+    );
+  }, [pickedStart]);
+
+  useEffect(() => {
+    if (!pickedEnd) return;
+    setCustomEnd(pickedEnd);
+    setDestinationId(CUSTOM_DESTINATION);
+    setEndLat(pickedEnd.lat.toFixed(5));
+    setEndLng(pickedEnd.lng.toFixed(5));
+    setNotice(
+      `Destination set from the map: ${pickedEnd.lat.toFixed(5)}, ${pickedEnd.lng.toFixed(5)}.`,
+    );
+  }, [pickedEnd]);
+
+  const useManualEnd = () => {
+    const lat = Number(endLat);
+    const lng = Number(endLng);
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+      setNotice("Destination latitude must be a number between -90 and 90.");
+      return;
+    }
+    if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
+      setNotice("Destination longitude must be a number between -180 and 180.");
+      return;
+    }
+    setCustomEnd({ lat, lng });
+    setDestinationId(CUSTOM_DESTINATION);
+    setNotice("Destination set from the coordinates you entered.");
+  };
 
   const useDeviceLocation = () => {
     if (!("geolocation" in navigator)) {
@@ -102,11 +164,7 @@ export default function RoutePlanner({
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!start || !destination) return;
-    onRequestRoute({
-      from: start,
-      to: { lat: destination.lat, lng: destination.lng },
-      compare,
-    });
+    onRequestRoute({ from: start, to: destination, compare });
   };
 
   return (
@@ -118,14 +176,28 @@ export default function RoutePlanner({
       <fieldset>
         <legend className="eyebrow">Start</legend>
         <p className="lede mt-1">{startLabel}</p>
-        <button
-          type="button"
-          onClick={useDeviceLocation}
-          disabled={loading}
-          className="btn mt-2"
-        >
-          Use my location
-        </button>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button type="button" onClick={useDeviceLocation} disabled={loading} className="btn">
+            Use my location
+          </button>
+          {/* Clicking the map is a shortcut for mouse users. The coordinate fields
+              below stay the keyboard path to the same result. */}
+          <button
+            type="button"
+            onClick={() => onPickTarget(pickTarget === "routeStart" ? null : "routeStart")}
+            aria-pressed={pickTarget === "routeStart"}
+            disabled={loading}
+            className="btn"
+          >
+            {pickTarget === "routeStart" ? "Stop choosing start" : "Choose on map"}
+          </button>
+        </div>
+        {pickTarget === "routeStart" ? (
+          <p className="box mt-2 px-2 py-1.5 text-xs">
+            Click the start on the map. The coordinates appear below and can be edited by
+            hand.
+          </p>
+        ) : null}
 
         <div className="mt-3 flex flex-wrap items-end gap-2">
           <span className="flex flex-col">
@@ -168,7 +240,8 @@ export default function RoutePlanner({
       <fieldset>
         <legend className="eyebrow">Destination</legend>
         <p className="lede mt-1">
-          A short list of places, since there is no address search in this build.
+          A short list of places, since there is no address search in this build, or a
+          point of your own.
         </p>
         <div className="mt-2 flex flex-col gap-1.5">
           {DESTINATIONS.map((place) => (
@@ -180,11 +253,76 @@ export default function RoutePlanner({
                 checked={destinationId === place.id}
                 onChange={() => setDestinationId(place.id)}
                 disabled={loading}
-                className="accent-[#f2c14e]"
               />
               <span>{place.label}</span>
             </label>
           ))}
+          <label className="flex items-baseline gap-2 text-sm">
+            <input
+              type="radio"
+              name="destination"
+              value={CUSTOM_DESTINATION}
+              checked={destinationId === CUSTOM_DESTINATION}
+              onChange={() => setDestinationId(CUSTOM_DESTINATION)}
+              disabled={loading}
+            />
+            <span>
+              A point I choose
+              {customEnd ? (
+                <span className="lede block">
+                  {customEnd.lat.toFixed(5)}, {customEnd.lng.toFixed(5)}
+                </span>
+              ) : null}
+            </span>
+          </label>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onPickTarget(pickTarget === "routeEnd" ? null : "routeEnd")}
+          aria-pressed={pickTarget === "routeEnd"}
+          disabled={loading}
+          className="btn mt-2"
+        >
+          {pickTarget === "routeEnd" ? "Stop choosing destination" : "Choose on map"}
+        </button>
+        {pickTarget === "routeEnd" ? (
+          <p className="box mt-2 px-2 py-1.5 text-xs">
+            Click the destination on the map. The coordinates appear below and can be
+            edited by hand.
+          </p>
+        ) : null}
+
+        <div className="mt-3 flex flex-wrap items-end gap-2">
+          <span className="flex flex-col">
+            <label htmlFor="route-end-lat" className="text-xs text-ink-muted">
+              Destination latitude
+            </label>
+            <input
+              id="route-end-lat"
+              inputMode="decimal"
+              value={endLat}
+              onChange={(event) => setEndLat(event.target.value)}
+              disabled={loading}
+              className="field w-28"
+            />
+          </span>
+          <span className="flex flex-col">
+            <label htmlFor="route-end-lng" className="text-xs text-ink-muted">
+              Destination longitude
+            </label>
+            <input
+              id="route-end-lng"
+              inputMode="decimal"
+              value={endLng}
+              onChange={(event) => setEndLng(event.target.value)}
+              disabled={loading}
+              className="field w-28"
+            />
+          </span>
+          <button type="button" onClick={useManualEnd} disabled={loading} className="btn">
+            Use these coordinates
+          </button>
         </div>
       </fieldset>
 
@@ -194,7 +332,6 @@ export default function RoutePlanner({
           checked={compare}
           onChange={(event) => setCompare(event.target.checked)}
           disabled={loading}
-          className="accent-[#f2c14e]"
         />
         <span>Compare with the route that ignores obstacles</span>
       </label>
@@ -212,8 +349,14 @@ export default function RoutePlanner({
             Clear route
           </button>
         ) : null}
-        {!start ? (
-          <span className="text-xs text-ink-muted">Set a start to find a route.</span>
+        {!start || !destination ? (
+          <span className="text-xs text-ink-muted">
+            {!start && !destination
+              ? "Set a start and a destination to find a route."
+              : !start
+                ? "Set a start to find a route."
+                : "Set a destination to find a route."}
+          </span>
         ) : null}
       </div>
 

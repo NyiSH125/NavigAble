@@ -29,6 +29,9 @@ const MapCanvas = dynamic(() => import("@/components/Map"), {
 /** Wait for panning to settle before refetching. */
 const MOVE_DEBOUNCE_MS = 350;
 
+/** Who a map click belongs to. */
+type PickTarget = "report" | "routeStart" | "routeEnd" | null;
+
 function bboxParam(bbox: Bbox): string {
   return [bbox.minLng, bbox.minLat, bbox.maxLng, bbox.maxLat]
     .map((n) => n.toFixed(6))
@@ -64,8 +67,14 @@ export default function Page() {
   const [routeError, setRouteError] = useState<string | null>(null);
   const [selectedStep, setSelectedStep] = useState<number | null>(null);
   const [focusPoint, setFocusPoint] = useState<LngLat | null>(null);
-  const [picking, setPicking] = useState(false);
-  const [pickedPoint, setPickedPoint] = useState<LngLat | null>(null);
+  /**
+   * Which control is waiting for a map click. One picking mode serves three
+   * consumers, so the point has to know where it is going.
+   */
+  const [pickTarget, setPickTarget] = useState<PickTarget>(null);
+  const [reportPoint, setReportPoint] = useState<LngLat | null>(null);
+  const [routeStartPoint, setRouteStartPoint] = useState<LngLat | null>(null);
+  const [routeEndPoint, setRouteEndPoint] = useState<LngLat | null>(null);
   /** Bumped after a successful submission to refetch the current viewport. */
   const [refreshToken, setRefreshToken] = useState(0);
 
@@ -189,7 +198,7 @@ export default function Page() {
   const hideMap = useCallback(() => {
     focusAfterToggle.current = "show";
     setMapVisible(false);
-    setPicking(false);
+    setPickTarget(null);
   }, []);
 
   // Re-routes whenever the endpoints or the profile change. The profile is part
@@ -268,8 +277,8 @@ export default function Page() {
     setRefreshToken((token) => token + 1);
   }, []);
 
-  const handlePickingChange = useCallback((next: boolean) => {
-    setPicking(next);
+  const handlePickTarget = useCallback((next: PickTarget) => {
+    setPickTarget(next);
     // The map is behind a toggle on small screens, so asking to choose a point on
     // it has to reveal it, otherwise the instruction is impossible to follow.
     if (next) setMapVisible(true);
@@ -281,16 +290,21 @@ export default function Page() {
    */
   const handleReportDone = useCallback(() => {
     setReportOpen(false);
-    setPicking(false);
-    setPickedPoint(null);
+    setPickTarget(null);
+    setReportPoint(null);
     setSelectedId(null);
     reportToggleRef.current?.focus();
   }, []);
 
-  const handlePickLocation = useCallback((point: LngLat) => {
-    setPickedPoint(point);
-    setPicking(false);
-  }, []);
+  const handlePickLocation = useCallback(
+    (point: LngLat) => {
+      if (pickTarget === "report") setReportPoint(point);
+      else if (pickTarget === "routeStart") setRouteStartPoint(point);
+      else if (pickTarget === "routeEnd") setRouteEndPoint(point);
+      setPickTarget(null);
+    },
+    [pickTarget],
+  );
 
   const handleBackToList = useCallback(() => {
     if (selectedId) itemRefs.current.get(selectedId)?.focus();
@@ -324,7 +338,7 @@ export default function Page() {
             ref={reportToggleRef}
             onClick={() => {
               setReportOpen((open) => {
-                if (open) setPicking(false);
+                if (open) setPickTarget(null);
                 return !open;
               });
             }}
@@ -364,9 +378,9 @@ export default function Page() {
             {reportOpen ? (
               <ReportForm
                 onCreated={handleCreated}
-                picking={picking}
-                onPickingChange={handlePickingChange}
-                pickedPoint={pickedPoint}
+                picking={pickTarget === "report"}
+                onPickingChange={(on) => handlePickTarget(on ? "report" : null)}
+                pickedPoint={reportPoint}
                 onDone={handleReportDone}
               />
             ) : null}
@@ -384,6 +398,10 @@ export default function Page() {
                 onRequestRoute={setRouteRequest}
                 onSelectStep={handleSelectStep}
                 onClear={handleClearRoute}
+                pickTarget={pickTarget === "routeStart" || pickTarget === "routeEnd" ? pickTarget : null}
+                onPickTarget={handlePickTarget}
+                pickedStart={routeStartPoint}
+                pickedEnd={routeEndPoint}
               />
             ) : null}
           </div>
@@ -463,8 +481,14 @@ export default function Page() {
             routeGeometry={route?.geometry ?? null}
             directGeometry={directRoute?.geometry ?? null}
             focusPoint={focusPoint}
-            pickingLocation={picking}
-            pickedPoint={pickedPoint}
+            pickingLocation={pickTarget !== null}
+            pickedPoints={
+              pickTarget === "report" || reportOpen
+                ? reportPoint
+                  ? [reportPoint]
+                  : []
+                : [routeStartPoint, routeEndPoint].filter((p): p is LngLat => p !== null)
+            }
             onPickLocation={handlePickLocation}
             onHideMap={hideMap}
             theme={theme}
