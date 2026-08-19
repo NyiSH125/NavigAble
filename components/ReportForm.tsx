@@ -131,6 +131,8 @@ export default function ReportForm({
   const [result, setResult] = useState<Report | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
+  const [dragActive, setDragActive] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const resultRef = useRef<HTMLDivElement | null>(null);
@@ -154,7 +156,56 @@ export default function ReportForm({
     );
   }, [pickedPoint]);
 
+  /**
+   * Dropping a file anywhere outside the drop zone makes the browser navigate to
+   * it, which would throw away a half-filled form. Swallow those while the form
+   * is mounted.
+   */
+  useEffect(() => {
+    const swallow = (event: DragEvent) => event.preventDefault();
+    window.addEventListener("dragover", swallow);
+    window.addEventListener("drop", swallow);
+    return () => {
+      window.removeEventListener("dragover", swallow);
+      window.removeEventListener("drop", swallow);
+    };
+  }, []);
+
+  const onDragEnter = (event: React.DragEvent) => {
+    event.preventDefault();
+    if (!busy) setDragActive(true);
+  };
+
+  const onDragOver = (event: React.DragEvent) => {
+    event.preventDefault();
+  };
+
+  const onDragLeave = (event: React.DragEvent) => {
+    event.preventDefault();
+    // Moving over a child fires dragleave on the parent, so only clear when the
+    // pointer actually leaves the zone.
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+    setDragActive(false);
+  };
+
+  const onDrop = (event: React.DragEvent) => {
+    event.preventDefault();
+    setDragActive(false);
+    if (busy) return;
+
+    const dropped = event.dataTransfer.files?.[0];
+    if (!dropped) return;
+    if (!dropped.type.startsWith("image/")) {
+      const message = `${dropped.name} is not an image. Drop a photo, or use Choose file.`;
+      setFileError(message);
+      setAnnouncement(message);
+      return;
+    }
+    pickFile(dropped);
+  };
+
   const pickFile = (next: File | null) => {
+    setFileError(null);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setFile(next);
     setPreviewUrl(next ? URL.createObjectURL(next) : null);
@@ -312,13 +363,17 @@ export default function ReportForm({
       </p>
 
       <div>
-        <label htmlFor="report-photo" className="block text-sm font-semibold tracking-wide uppercase">
+        <span className="block text-sm font-semibold tracking-wide uppercase">
           Photo of the obstacle
-        </label>
+        </span>
         <p id="report-photo-hint" className="mt-1 text-xs text-ink-muted">
           A walkway, entrance, crossing, or transit access point. Anything else is rejected
           and nothing is stored.
         </p>
+
+        {/* The native input is the mechanism, not the control. A real button
+            drives it, so the label reads the same in every browser and stays a
+            single keyboard stop. */}
         <input
           ref={fileInputRef}
           id="report-photo"
@@ -326,22 +381,55 @@ export default function ReportForm({
           type="file"
           accept="image/*"
           capture="environment"
-          aria-describedby="report-photo-hint"
           onChange={(event) => pickFile(event.target.files?.[0] ?? null)}
           disabled={busy}
-          className="mt-2 w-full border border-line px-2 py-1.5 text-sm"
+          className="hidden"
         />
+
+        <div
+          onDragEnter={onDragEnter}
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          onDrop={onDrop}
+          className={`mt-2 border p-3 ${dragActive ? "border-focus bg-raised" : "border-hairline"}`}
+        >
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            aria-describedby="report-photo-hint"
+            disabled={busy}
+            className="border border-line px-3 py-1.5 text-sm"
+          >
+            Choose file
+          </button>
+
+          {file ? null : <p className="mt-2 text-xs text-ink-muted">No file chosen</p>}
+
+          {/* Dropping is an extra, never the only way in. */}
+          <p className="mt-2 text-xs text-ink-muted">
+            {dragActive ? "Release to use this photo." : "You can also drag a photo here."}
+          </p>
+
+          {fileError ? <p className="mt-2 text-xs">{fileError}</p> : null}
+        </div>
       </div>
 
       {previewUrl ? (
-        /* eslint-disable-next-line @next/next/no-img-element -- local object URL,
-           nothing for the image optimizer to fetch or cache. */
-        <img
-          src={previewUrl}
-          alt={result?.ai_description ?? (file ? `Selected photo, ${file.name}` : "Selected photo")}
-          className="w-full border border-hairline object-cover"
-          style={{ aspectRatio: "4 / 3" }}
-        />
+        <figure>
+          {/* eslint-disable-next-line @next/next/no-img-element -- local object URL,
+              nothing for the image optimizer to fetch or cache. */}
+          <img
+            src={previewUrl}
+            alt={
+              result?.ai_description ?? (file ? `Selected photo, ${file.name}` : "Selected photo")
+            }
+            className="w-full border border-hairline object-cover"
+            style={{ aspectRatio: "4 / 3" }}
+          />
+          <figcaption className="mt-1.5 text-xs text-ink-muted">
+            {file ? `${file.name}, ${Math.round(file.size / 1024)} KB` : "Selected photo"}
+          </figcaption>
+        </figure>
       ) : null}
 
       <fieldset>
