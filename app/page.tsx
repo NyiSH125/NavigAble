@@ -307,7 +307,11 @@ export default function Page() {
   );
 
   const handleBackToList = useCallback(() => {
+    // Focus before clearing: the row is still on screen either way, and moving
+    // focus first means a keyboard user can press Enter straight away to reopen
+    // the same report.
     if (selectedId) itemRefs.current.get(selectedId)?.focus();
+    setSelectedId(null);
   }, [selectedId]);
 
   // One live region for the whole workspace, so state changes are announced
@@ -330,9 +334,9 @@ export default function Page() {
       </a>
 
       <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line px-4 py-3">
-        <h1 className="wordmark">NavigAble</h1>
-
         <div className="flex flex-wrap items-center gap-2">
+          <h1 className="wordmark mr-1">NavigAble</h1>
+
           <button
             type="button"
             ref={reportToggleRef}
@@ -358,9 +362,9 @@ export default function Page() {
           >
             {routeOpen ? "Close route planner" : "Plan a route"}
           </button>
-
-          <ThemeToggle theme={theme} onChange={setTheme} />
         </div>
+
+        <ThemeToggle theme={theme} onChange={setTheme} />
       </header>
 
       <p aria-live="polite" role="status" className="sr-only">
