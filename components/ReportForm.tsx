@@ -13,6 +13,8 @@ interface ReportFormProps {
   onPickingChange: (picking: boolean) => void;
   /** The point most recently clicked on the map, or null. */
   pickedPoint: { lat: number; lng: number } | null;
+  /** Dismisses the whole reporting panel and goes back to browsing. */
+  onDone: () => void;
 }
 
 type Status = "idle" | "preparing" | "analyzing" | "success" | "error";
@@ -116,6 +118,7 @@ export default function ReportForm({
   picking,
   onPickingChange,
   pickedPoint,
+  onDone,
 }: ReportFormProps) {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -498,9 +501,16 @@ export default function ReportForm({
             </div>
           </dl>
 
-          <button type="button" onClick={reset} className="mt-3 border border-line px-2 py-1 text-xs">
-            Report another obstacle
-          </button>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={reset} className="border border-line px-2 py-1 text-xs">
+              Report another obstacle
+            </button>
+            {/* Closes the panel and the detail view of the report just filed, so
+                the summary is not left on screen with no way out of it. */}
+            <button type="button" onClick={onDone} className="border border-line px-2 py-1 text-xs">
+              Back to list
+            </button>
+          </div>
         </div>
       ) : null}
     </form>

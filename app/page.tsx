@@ -61,6 +61,7 @@ export default function Page() {
   const [refreshToken, setRefreshToken] = useState(0);
 
   const itemRefs = useRef(new Map<string, HTMLButtonElement | null>());
+  const reportToggleRef = useRef<HTMLButtonElement | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const registerItemRef = useCallback((id: string, node: HTMLButtonElement | null) => {
@@ -190,6 +191,18 @@ export default function Page() {
     if (next) setMapVisible(true);
   }, []);
 
+  /**
+   * Leaves the reporting flow. Clears the selection too, otherwise the report
+   * just filed stays open in the detail panel below the list.
+   */
+  const handleReportDone = useCallback(() => {
+    setReportOpen(false);
+    setPicking(false);
+    setPickedPoint(null);
+    setSelectedId(null);
+    reportToggleRef.current?.focus();
+  }, []);
+
   const handlePickLocation = useCallback((point: LngLat) => {
     setPickedPoint(point);
     setPicking(false);
@@ -240,6 +253,7 @@ export default function Page() {
           <div className="border-b border-line">
             <button
               type="button"
+              ref={reportToggleRef}
               onClick={() => {
                 setReportOpen((open) => {
                   if (open) setPicking(false);
@@ -264,6 +278,7 @@ export default function Page() {
                 picking={picking}
                 onPickingChange={handlePickingChange}
                 pickedPoint={pickedPoint}
+                onDone={handleReportDone}
               />
             ) : null}
           </div>
