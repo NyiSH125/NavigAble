@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  LngLatBounds,
   Map as MapLibreMap,
   NavigationControl,
   setWorkerUrl,
@@ -24,11 +25,21 @@ setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 const SOURCE_ID = "reports";
 const LAYER_PINS = "reports-pins";
 const LAYER_SELECTED = "reports-selected";
+const SOURCE_ROUTE = "route";
+const LAYER_ROUTE = "route-line";
+const SOURCE_DIRECT = "route-direct";
+const LAYER_DIRECT = "route-direct-line";
 
 interface MapProps {
   reports: Report[];
   profile: SeverityProfile;
   selectedId: string | null;
+  /** Route line, drawn beneath the pins. Decorative: RouteSteps is canonical. */
+  routeGeometry?: Array<[number, number]> | null;
+  /** The same endpoints ignoring obstacles, shown dashed for comparison. */
+  directGeometry?: Array<[number, number]> | null;
+  /** A point to centre on, used when a route step is selected. */
+  focusPoint?: { lng: number; lat: number } | null;
   /** Fires after a user-driven move settles. Programmatic pans do not fire it. */
   onBoundsChange: (bbox: Bbox) => void;
   onSelect: (id: string) => void;
@@ -52,6 +63,13 @@ function toFeatureCollection(
   };
 }
 
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
 /** Builds a data-driven match expression keyed on the severity property. */
 function severityMatch<T>(pick: (level: SeverityScore) => T, fallback: T) {
   return [
@@ -69,10 +87,25 @@ function severityMatch<T>(pick: (level: SeverityScore) => T, fallback: T) {
   ] as unknown as ExpressionSpecification;
 }
 
+function lineFeature(
+  coordinates: Array<[number, number]>,
+): GeoJSON.FeatureCollection<GeoJSON.LineString> {
+  return {
+    type: "FeatureCollection",
+    features:
+      coordinates.length > 1
+        ? [{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates } }]
+        : [],
+  };
+}
+
 export default function Map({
   reports,
   profile,
   selectedId,
+  routeGeometry = null,
+  directGeometry = null,
+  focusPoint = null,
   onBoundsChange,
   onSelect,
 }: MapProps) {
@@ -140,6 +173,32 @@ export default function Map({
     );
 
     map.on("load", () => {
+      // Added first so the pins, added below, paint over the line.
+      map.addSource(SOURCE_DIRECT, { type: "geojson", data: lineFeature([]) });
+      map.addLayer({
+        id: LAYER_DIRECT,
+        type: "line",
+        source: SOURCE_DIRECT,
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: {
+          "line-color": "#8d8677",
+          "line-width": 3,
+          "line-dasharray": [2, 2],
+        },
+      });
+
+      map.addSource(SOURCE_ROUTE, { type: "geojson", data: lineFeature([]) });
+      map.addLayer({
+        id: LAYER_ROUTE,
+        type: "line",
+        source: SOURCE_ROUTE,
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: {
+          "line-color": "#5fa8a0",
+          "line-width": 5,
+        },
+      });
+
       map.addSource(SOURCE_ID, {
         type: "geojson",
         data: { type: "FeatureCollection", features: [] },
@@ -248,6 +307,39 @@ export default function Map({
     source?.setData(toFeatureCollection(reports, profile));
   }, [reports, profile]);
 
+  // Push route geometry and frame it. Framing is a programmatic move, so it must
+  // not trigger a refetch.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !readyRef.current) return;
+
+    const route = map.getSource(SOURCE_ROUTE) as GeoJSONSource | undefined;
+    route?.setData(lineFeature(routeGeometry ?? []));
+    const direct = map.getSource(SOURCE_DIRECT) as GeoJSONSource | undefined;
+    direct?.setData(lineFeature(directGeometry ?? []));
+
+    if (!routeGeometry || routeGeometry.length < 2) return;
+
+    const bounds = routeGeometry.reduce(
+      (acc, [lng, lat]) => acc.extend([lng, lat]),
+      new LngLatBounds(routeGeometry[0], routeGeometry[0]),
+    );
+    programmaticRef.current = true;
+    map.fitBounds(bounds, { padding: 48, duration: prefersReducedMotion() ? 0 : 400 });
+  }, [routeGeometry, directGeometry]);
+
+  // Centre on a chosen route step.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !readyRef.current || !focusPoint) return;
+    programmaticRef.current = true;
+    if (prefersReducedMotion()) {
+      map.jumpTo({ center: [focusPoint.lng, focusPoint.lat] });
+    } else {
+      map.easeTo({ center: [focusPoint.lng, focusPoint.lat], duration: 350 });
+    }
+  }, [focusPoint]);
+
   // Mirror the selection and pan to it.
   useEffect(() => {
     const map = mapRef.current;
@@ -259,12 +351,8 @@ export default function Map({
     const target = reports.find((report) => report.id === selectedId);
     if (!target) return;
 
-    const prefersReducedMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
     programmaticRef.current = true;
-    if (prefersReducedMotion) {
+    if (prefersReducedMotion()) {
       map.jumpTo({ center: [target.lng, target.lat] });
     } else {
       map.easeTo({ center: [target.lng, target.lat], duration: 400 });

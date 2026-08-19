@@ -8,6 +8,9 @@ import { DEFAULT_PROFILE, profileMeta, type Report } from "@/lib/reports";
 import { initialBbox, parseCenter, type Bbox } from "@/lib/viewport";
 import ObstacleFilters from "@/components/ObstacleFilters";
 import ReportForm from "@/components/ReportForm";
+import RoutePlanner, { type RouteRequest } from "@/components/RoutePlanner";
+import type { RouteView } from "@/components/RouteSteps";
+import type { LngLat } from "@/lib/routing";
 import ReportDetail from "@/components/ReportDetail";
 import ReportList from "@/components/ReportList";
 import { MapSkeleton, ReportListSkeleton } from "@/components/Skeleton";
@@ -43,6 +46,15 @@ export default function Page() {
 
   const [mapVisible, setMapVisible] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [routeOpen, setRouteOpen] = useState(false);
+
+  const [routeRequest, setRouteRequest] = useState<RouteRequest | null>(null);
+  const [route, setRoute] = useState<RouteView | null>(null);
+  const [directRoute, setDirectRoute] = useState<RouteView | null>(null);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
+  const [selectedStep, setSelectedStep] = useState<number | null>(null);
+  const [focusPoint, setFocusPoint] = useState<LngLat | null>(null);
   /** Bumped after a successful submission to refetch the current viewport. */
   const [refreshToken, setRefreshToken] = useState(0);
 
@@ -91,6 +103,60 @@ export default function Page() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
+  }, []);
+
+  // Re-routes whenever the endpoints or the profile change. The profile is part
+  // of the key on purpose: a different profile is a different route, which is the
+  // whole point of the feature.
+  useEffect(() => {
+    if (!routeRequest) return;
+
+    const controller = new AbortController();
+    setRouteLoading(true);
+    setRouteError(null);
+    setSelectedStep(null);
+
+    fetch("/api/route", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: routeRequest.from,
+        to: routeRequest.to,
+        profile,
+        compare: routeRequest.compare,
+      }),
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const body = await response.json();
+        if (!response.ok) throw new Error(body?.message ?? "No route could be found.");
+        setRoute(body.route as RouteView);
+        setDirectRoute((body.direct as RouteView | null) ?? null);
+      })
+      .catch((cause: unknown) => {
+        if (cause instanceof DOMException && cause.name === "AbortError") return;
+        setRouteError(cause instanceof Error ? cause.message : "No route could be found.");
+        setRoute(null);
+        setDirectRoute(null);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setRouteLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [routeRequest, profile]);
+
+  const handleSelectStep = useCallback((index: number, at: LngLat) => {
+    setSelectedStep(index);
+    setFocusPoint(at);
+  }, []);
+
+  const handleClearRoute = useCallback(() => {
+    setRouteRequest(null);
+    setRoute(null);
+    setDirectRoute(null);
+    setRouteError(null);
+    setSelectedStep(null);
   }, []);
 
   const selectedReport = useMemo(
@@ -176,6 +242,37 @@ export default function Page() {
             {reportOpen ? <ReportForm onCreated={handleCreated} /> : null}
           </div>
 
+          <div className="border-b border-line">
+            <button
+              type="button"
+              onClick={() => setRouteOpen((open) => !open)}
+              aria-expanded={routeOpen}
+              aria-controls="route-planner-panel"
+              className="w-full px-4 py-3 text-left text-sm font-semibold tracking-wide uppercase"
+            >
+              {routeOpen ? "Close route planner" : "Plan a route"}
+              <span className="mt-0.5 block text-xs font-normal normal-case tracking-normal text-ink-muted">
+                Routes around obstacles that block your profile.
+              </span>
+            </button>
+          </div>
+
+          <div id="route-planner-panel" hidden={!routeOpen}>
+            {routeOpen ? (
+              <RoutePlanner
+                profile={profile}
+                route={route}
+                direct={directRoute}
+                loading={routeLoading}
+                error={routeError}
+                selectedStep={selectedStep}
+                onRequestRoute={setRouteRequest}
+                onSelectStep={handleSelectStep}
+                onClear={handleClearRoute}
+              />
+            ) : null}
+          </div>
+
           <ObstacleFilters
             profile={profile}
             onProfileChange={setProfile}
@@ -239,6 +336,9 @@ export default function Page() {
             reports={reports}
             profile={profile}
             selectedId={selectedId}
+            routeGeometry={route?.geometry ?? null}
+            directGeometry={directRoute?.geometry ?? null}
+            focusPoint={focusPoint}
             onBoundsChange={handleBoundsChange}
             onSelect={setSelectedId}
           />
